@@ -1,0 +1,36 @@
+import pg from "pg";
+import type { Queryable } from "./queryable";
+
+pg.types.setTypeParser(20, (v) => v);
+pg.types.setTypeParser(1700, (v) => v);
+
+const g = globalThis as unknown as { __pgPool?: pg.Pool };
+
+/**
+ * One small pool per serverless instance, reused across warm invocations.
+ * Point DATABASE_URL at the Supabase *transaction pooler* (port 6543) so many instances share few connections.
+ */
+export function getDb(): Queryable {
+  if (!g.__pgPool) {
+    const url = process.env.DATABASE_URL;
+    if (!url) throw new Error("DATABASE_URL is not set");
+    g.__pgPool = new pg.Pool({ connectionString: url, max: 3, idleTimeoutMillis: 10_000, connectionTimeoutMillis: 5_000 });
+  }
+  return g.__pgPool as unknown as Queryable;
+}
+
+let failedAt = 0;
+
+/**
+ * The database when it is configured and reachable, otherwise null. After a failure it stays "down" for 10s so a
+ * dead database costs one timeout per window, not one per request. Callers must treat null as "no indexer".
+ */
+export function getDbOrNull(): Queryable | null {
+  if (!process.env.DATABASE_URL) return null;
+  if (Date.now() - failedAt < 10_000) return null;
+  return getDb();
+}
+
+export function markDbFailure() {
+  failedAt = Date.now();
+}

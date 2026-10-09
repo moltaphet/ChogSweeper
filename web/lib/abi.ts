@@ -1,0 +1,87 @@
+const asset = [
+  { name: "nft", type: "address" },
+  { name: "tokenId", type: "uint256" },
+] as const;
+
+export const sweeperAbi = [
+  {
+    type: "function",
+    name: "createSwap",
+    stateMutability: "payable",
+    inputs: [
+      { name: "taker", type: "address" },
+      { name: "offered", type: "tuple[]", components: asset },
+      { name: "wanted", type: "tuple[]", components: asset },
+      { name: "wantedMon", type: "uint128" },
+      { name: "expiry", type: "uint64" },
+    ],
+    outputs: [{ name: "swapId", type: "uint256" }],
+  },
+  { type: "function", name: "acceptSwap", stateMutability: "payable", inputs: [{ name: "tradeId", type: "uint256" }], outputs: [] },
+  { type: "function", name: "cancelSwap", stateMutability: "nonpayable", inputs: [{ name: "tradeId", type: "uint256" }], outputs: [] },
+  { type: "function", name: "declineSwap", stateMutability: "nonpayable", inputs: [{ name: "tradeId", type: "uint256" }], outputs: [] },
+  {
+    type: "function",
+    name: "quoteAcceptance",
+    stateMutability: "view",
+    inputs: [{ name: "tradeId", type: "uint256" }, { name: "taker", type: "address" }],
+    outputs: [{ type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "getTrade",
+    stateMutability: "view",
+    inputs: [{ name: "tradeId", type: "uint256" }],
+    outputs: [
+      { name: "maker", type: "address" },
+      { name: "taker", type: "address" },
+      { name: "status", type: "uint8" },
+      { name: "expiry", type: "uint64" },
+      { name: "offeredMon", type: "uint256" },
+      { name: "wantedMon", type: "uint256" },
+      { name: "offered", type: "tuple[]", components: asset },
+      { name: "wanted", type: "tuple[]", components: asset },
+    ],
+  },
+  {
+    type: "event",
+    name: "TradeCreated",
+    inputs: [
+      { name: "tradeId", type: "uint256", indexed: true },
+      { name: "maker", type: "address", indexed: true },
+      { name: "taker", type: "address", indexed: true },
+      { name: "offered", type: "tuple[]", components: asset },
+      { name: "offeredMon", type: "uint256" },
+      { name: "wanted", type: "tuple[]", components: asset },
+      { name: "wantedMon", type: "uint256" },
+      { name: "expiry", type: "uint64" },
+    ],
+  },
+] as const;
+
+export const erc721Abi = [
+  { type: "function", name: "name", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
+  { type: "function", name: "balanceOf", stateMutability: "view", inputs: [{ name: "owner", type: "address" }], outputs: [{ type: "uint256" }] },
+  {
+    type: "function",
+    name: "tokenOfOwnerByIndex",
+    stateMutability: "view",
+    inputs: [{ name: "owner", type: "address" }, { name: "index", type: "uint256" }],
+    outputs: [{ type: "uint256" }],
+  },
+  { type: "function", name: "tokenURI", stateMutability: "view", inputs: [{ name: "tokenId", type: "uint256" }], outputs: [{ type: "string" }] },
+  {
+    type: "function",
+    name: "isApprovedForAll",
+    stateMutability: "view",
+    inputs: [{ name: "owner", type: "address" }, { name: "operator", type: "address" }],
+    outputs: [{ type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "setApprovalForAll",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "operator", type: "address" }, { name: "approved", type: "bool" }],
+    outputs: [],
+  },
+] as const;
