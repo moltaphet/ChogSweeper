@@ -1,0 +1,7 @@
+{
+  "_comment": "Seed list of verified collections per chain id. ecosystem is 'chog' or 'monad'. startBlock is the collection's deploy block (history before it is not scanned). `ops/export-deployment.mjs` turns this, plus the MockChog it deployed, into VERIFIED_COLLECTIONS (web) and COLLECTIONS (indexer). Add the official Chog and partner collections here once their testnet addresses are confirmed.",
+  "chains": {
+    "10143": [],
+    "143": []
+  }
+}

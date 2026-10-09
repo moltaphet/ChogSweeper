@@ -1,0 +1,17 @@
+{
+  "name": "chogsweeper-ops",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "export": "node export-deployment.mjs",
+    "smoke": "node smoke.mjs",
+    "e2e:local": "node e2e-local.mjs"
+  },
+  "dependencies": {
+    "viem": "^2.57.4"
+  },
+  "devDependencies": {
+    "embedded-postgres": "^18.4.0-beta.17"
+  }
+}

@@ -1,0 +1,206 @@
+// ChogSweeper data model (PostgreSQL / Supabase).
+//
+// This file is the typed view of the tables created by db/migrations/*.sql, which are the source of
+// truth for DDL (the indexer applies them on boot). Names are mapped so Prisma Client can be used for
+// admin tooling, scripts and dashboards without a second schema. After applying the migrations to a
+// database, prove the two agree (exit code 0 = identical):
+//   npx prisma migrate diff --from-url "$DATABASE_URL" --to-schema-datamodel prisma/schema.prisma --exit-code
+//
+// Conventions: addresses are lowercase 0x strings; uint256 values are Decimal(78,0); block numbers BigInt.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------------------------------------------
+// Trades
+// ------------------------------------------------------------------------------------------------
+
+/// PENDING / ACCEPTED / CANCELLED / DECLINED mirror the contract's lifecycle.
+/// EXPIRED is time-derived and written by the indexer (projection + 5s sweep): the contract still
+/// reports such a trade as active, but it can no longer be accepted, only cancelled or declined.
+enum TradeStatus {
+  PENDING
+  ACCEPTED
+  CANCELLED
+  DECLINED
+  EXPIRED
+}
+
+/// A wallet that has appeared in at least one trade.
+model Participant {
+  address        String   @id
+  firstSeenBlock BigInt   @map("first_seen_block")
+  firstSeenAt    DateTime @map("first_seen_at") @db.Timestamptz(6)
+
+  tradesAsMaker    Trade[] @relation("TradeMaker")
+  tradesAsTaker    Trade[] @relation("TradeTaker")
+  tradesAcceptedBy Trade[] @relation("TradeAcceptedBy")
+
+  @@map("participants")
+}
+
+/// One escrowed trade (contract `Trade`). Projection of `SwapEvent` rows; safe to rebuild from them.
+model Trade {
+  id            Decimal     @id @db.Decimal(78, 0)
+  maker         String
+  /// null = Open Counter (anyone may accept); otherwise Direct Swap to this wallet.
+  taker         String?
+  status        TradeStatus
+  acceptedBy    String?     @map("accepted_by")
+  offeredMon    Decimal     @map("offered_mon") @db.Decimal(78, 0)
+  wantedMon     Decimal     @map("wanted_mon") @db.Decimal(78, 0)
+  /// Platform fee the taker paid on top of wantedMon; null until accepted.
+  feePaid       Decimal?    @map("fee_paid") @db.Decimal(78, 0)
+  expiry        DateTime    @db.Timestamptz(6)
+  createdBlock  BigInt      @map("created_block")
+  createdTx     String      @map("created_tx")
+  createdAt     DateTime    @map("created_at") @db.Timestamptz(6)
+  settledBlock  BigInt?     @map("settled_block")
+  settledTx     String?     @map("settled_tx")
+  settledAt     DateTime?   @map("settled_at") @db.Timestamptz(6)
+
+  makerParticipant      Participant  @relation("TradeMaker", fields: [maker], references: [address], onDelete: NoAction, onUpdate: NoAction, map: "swaps_maker_fk")
+  takerParticipant      Participant? @relation("TradeTaker", fields: [taker], references: [address], onDelete: NoAction, onUpdate: NoAction, map: "swaps_taker_fk")
+  acceptedByParticipant Participant? @relation("TradeAcceptedBy", fields: [acceptedBy], references: [address], onDelete: NoAction, onUpdate: NoAction, map: "swaps_accepted_by_fk")
+  assets                TradeAsset[]
+
+  // Also in SQL (partial, so not declarable here): swaps_taker_idx, swaps_accepted_by_idx,
+  // swaps_pending_idx, swaps_expiry_sweep_idx.
+  @@index([maker, id(sort: Desc)], map: "swaps_maker_idx")
+  @@map("swaps")
+}
+
+/// One ERC-721 in a trade's bundle. `side` is "offered" (maker escrowed) or "wanted" (taker must deliver).
+model TradeAsset {
+  tradeId  Decimal @map("swap_id") @db.Decimal(78, 0)
+  side     String
+  position Int
+  contract String
+  tokenId  Decimal @map("token_id") @db.Decimal(78, 0)
+
+  trade Trade    @relation(fields: [tradeId], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  token NftToken @relation(fields: [contract, tokenId], references: [contract, tokenId], onDelete: NoAction, onUpdate: NoAction, map: "swap_assets_token_fk")
+
+  @@id([tradeId, side, position])
+  @@index([contract, tokenId], map: "swap_assets_token_idx")
+  @@map("swap_assets")
+}
+
+/// Raw contract events, the source of truth for `Trade`. (txHash, logIndex) deduplicates replays.
+model SwapEvent {
+  txHash      String   @map("tx_hash")
+  logIndex    Int      @map("log_index")
+  blockNumber BigInt   @map("block_number")
+  blockHash   String   @map("block_hash")
+  blockTime   DateTime @map("block_time") @db.Timestamptz(6)
+  /// created | accepted | cancelled | declined
+  kind        String
+  swapId      Decimal  @map("swap_id") @db.Decimal(78, 0)
+  args        Json
+
+  @@id([txHash, logIndex])
+  @@index([blockNumber], map: "swap_events_block_idx")
+  @@index([swapId, blockNumber, logIndex], map: "swap_events_swap_idx")
+  @@map("swap_events")
+}
+
+// ------------------------------------------------------------------------------------------------
+// Collections, tokens, ownership
+// ------------------------------------------------------------------------------------------------
+
+/// Collection registry. `verified` + `ecosystem` drive the verified badges in the UI;
+/// configuration (COLLECTIONS env) is the source of truth and is re-applied on every indexer boot.
+model Collection {
+  address       String   @id
+  name          String?
+  symbol        String?
+  isChog        Boolean  @default(false) @map("is_chog")
+  /// Verified as part of the Monad / Chog ecosystem.
+  verified      Boolean  @default(false)
+  /// 'chog' | 'monad'. Only allowed when verified (CHECK constraint).
+  ecosystem     String?
+  imageUrl      String?  @map("image_url")
+  website       String?
+  startBlock    BigInt   @default(0) @map("start_block")
+  backfilledTo  BigInt   @default(-1) @map("backfilled_to")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("nft_collections")
+}
+
+model NftToken {
+  contract         String
+  tokenId          Decimal   @map("token_id") @db.Decimal(78, 0)
+  /// null once burned (or before the first transfer is seen)
+  owner            String?
+  tokenUri         String?   @map("token_uri")
+  name             String?
+  /// Legacy resolved URL; `imageUri` wins when present.
+  imageUrl         String?   @map("image_url")
+  description      String?
+  /// Canonical, gateway-independent image reference: ipfs://cid/path, ar://id, https URL or an image data URI.
+  imageUri         String?   @map("image_uri")
+  /// Last resolution error, for diagnostics.
+  metaError        String?   @map("meta_error")
+  attributes       Json?
+  /// pending | ok | failed
+  metaStatus       String    @default("pending") @map("meta_status")
+  metaAttempts     Int       @default(0) @map("meta_attempts")
+  metaNextAttempt  DateTime  @default(now()) @map("meta_next_attempt") @db.Timestamptz(6)
+  metaFetchedAt    DateTime? @map("meta_fetched_at") @db.Timestamptz(6)
+
+  traits NftTrait[]
+  trades TradeAsset[]
+
+  @@id([contract, tokenId])
+  @@map("nft_tokens")
+}
+
+model NftTrait {
+  contract  String
+  tokenId   Decimal @map("token_id") @db.Decimal(78, 0)
+  traitType String  @map("trait_type")
+  value     String
+
+  token NftToken @relation(fields: [contract, tokenId], references: [contract, tokenId], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([contract, tokenId, traitType, value])
+  @@index([contract, traitType, value], map: "nft_traits_lookup_idx")
+  @@map("nft_traits")
+}
+
+/// ERC-721 Transfer logs of tracked collections; current ownership is derived from the newest row per token.
+model NftTransfer {
+  txHash      String  @map("tx_hash")
+  logIndex    Int     @map("log_index")
+  blockNumber BigInt  @map("block_number")
+  blockHash   String  @map("block_hash")
+  contract    String
+  tokenId     Decimal @map("token_id") @db.Decimal(78, 0)
+  fromAddr    String  @map("from_addr")
+  toAddr      String  @map("to_addr")
+
+  @@id([txHash, logIndex])
+  @@index([contract, tokenId, blockNumber(sort: Desc), logIndex(sort: Desc)], map: "nft_transfers_token_idx")
+  @@index([blockNumber], map: "nft_transfers_block_idx")
+  @@map("nft_transfers")
+}
+
+// ------------------------------------------------------------------------------------------------
+// Indexer state
+// ------------------------------------------------------------------------------------------------
+
+model IndexerCursor {
+  name      String   @id
+  block     BigInt
+  blockHash String   @map("block_hash")
+  updatedAt DateTime @default(now()) @map("updated_at") @db.Timestamptz(6)
+
+  @@map("indexer_cursors")
+}
