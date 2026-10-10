@@ -63,7 +63,8 @@ export function ChogPile() {
         const cardW = Math.max(92, Math.min(176, W / 9));
         const count = Math.max(6, Math.min(IDS.length, Math.round((0.34 * W * H) / (cardW * cardW * 1.2))));
 
-        const engine = Engine.create({ gravity: { x: 0, y: 1.1 }, enableSleeping: true });
+        const engine = Engine.create({ gravity: { x: 0, y: 2.1 }, enableSleeping: true });
+        engine.timing.timeScale = 1.5; // snappier: the fall reads as rain, not slow motion
         const wall = 200;
         const thick = 80;
         World.add(engine.world, [
@@ -92,9 +93,9 @@ export function ChogPile() {
           Body.setAngle(body, (Math.random() - 0.5) * (calm ? 0.5 : 2.4));
           Body.setAngularVelocity(body, calm ? 0 : (Math.random() - 0.5) * 0.3);
           // ... with a sideways kick, so on landing every piece skids off in its own direction.
-          Body.setVelocity(body, { x: (Math.random() - 0.5) * (calm ? 3 : 14), y: 5 + Math.random() * 6 });
+          Body.setVelocity(body, { x: (Math.random() - 0.5) * (calm ? 3 : 14), y: 9 + Math.random() * 8 });
           const live = kind === "card" ? i < count : kind === "coin" ? i - COIN_AT < COINS : i - LETTER_AT < Math.max(2, Math.round(count / 3));
-          if (live) bodies.push({ piece: p, body, delay: instant ? 0 : Math.random() * (calm ? 1200 : 2200), added: false });
+          if (live) bodies.push({ piece: p, body, delay: instant ? 0 : Math.random() * (calm ? 900 : 1400), added: false });
           p.el.style.opacity = "0";
         });
 
