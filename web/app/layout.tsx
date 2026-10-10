@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   description: "Swap Chog-to-Chog, bundle multi-NFT trades, and balance deals with native MON. Atomic on-chain settlement on Monad.",
 };
 
-export const viewport: Viewport = { themeColor: "#F7F5FE" };
+export const viewport: Viewport = { themeColor: "#D6CBFF" };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

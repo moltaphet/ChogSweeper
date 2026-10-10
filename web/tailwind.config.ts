@@ -9,13 +9,13 @@ const config: Config = {
     extend: {
       colors: {
         monad: {
-          bg: "#F7F5FE", // page background (soft lavender tint)
+          bg: "#EFEAFF", // soft lavender tint used inside cards
           surface: "#FFFFFF", // cards and surfaces
           border: "#DDD6FE", // soft card border
           primary: "#836EF9", // brand purple: buttons, active states, badges
           deep: "#5E43F3", // hover states and primary typography accents
           ink: "#1C1536", // headings and strong text
-          muted: "#6B6188", // muted labels
+          muted: "#4E4375", // muted labels (a notch darker so it stays readable on the violet page)
           tint: "#EFEBFE", // light wash for selected / hover surfaces
         },
         // Status indicators. The base hues (#10B981 / #EF4444) are used for dots, icons and borders;
@@ -47,7 +47,8 @@ const config: Config = {
       },
       backgroundImage: {
         // The brief's page wash: lavender -> white -> lavender.
-        page: "linear-gradient(to bottom, #F7F5FE, #FFFFFF 45%, #F1EEFE)",
+        // Monad violet: glows of the brand purple over a lavender-to-violet wash that deepens down the page.
+        page: "radial-gradient(1100px 650px at 6% -8%, rgba(131,110,249,0.55), transparent 62%), radial-gradient(900px 620px at 100% 12%, rgba(110,84,255,0.32), transparent 62%), radial-gradient(1000px 700px at 50% 108%, rgba(94,67,243,0.38), transparent 65%), linear-gradient(180deg, #EBE5FF 0%, #D6CBFF 42%, #BBAAFF 100%)",
         violet: "linear-gradient(135deg, #836EF9 0%, #5E43F3 100%)",
         "violet-soft": "linear-gradient(135deg, rgba(131,110,249,0.16), rgba(94,67,243,0.06))",
       },
