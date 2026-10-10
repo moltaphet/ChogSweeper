@@ -179,17 +179,23 @@ then the metadata JSON over `ipfs://` / `ar://` / `data:` / `http(s)`, then the 
 The contract guarantees that a trade settles atomically on its stated terms and that the owner can never change an
 existing trade. It cannot guarantee that a token behaves like a real NFT.
 
-* **Fake or hostile collections.** `createSwap` checks `ownerOf` after the deposit, but a hostile ERC-721 can answer that
-  honestly and then do nothing on `transferFrom` at settlement, so a taker who pays MON receives nothing. No on-chain check
-  prevents this. The UI therefore marks collections outside the verified registry as "Unverified", and a taker must tick an
-  explicit confirmation (and cannot accept from a list row) before accepting such a trade.
-* **Fee exemption for Chog holders** only looks at the taker's balance at the moment of acceptance. On testnet `MockChog.mint`
+* **Fake or hostile collections.** A hostile ERC-721 can answer `ownerOf` honestly at deposit and then do nothing on
+  `transferFrom` at settlement, so a taker who pays MON would receive nothing. The contract therefore only allows collections
+  on its verified list. The risk that remains is a collection the owner verifies by mistake, so add collections only after
+  checking their code. The UI still asks a taker to confirm when a trade shows a collection the registry does not know.
+* **Fee exemption for Chog holders** only looks at the maker's balance at the moment of creation. On testnet `MockChog.mint`
   is open to everyone, so the exemption is trivially obtainable there. On mainnet, anyone who can borrow or cheaply buy a Chog
-  for one transaction can skip the fee. Treat the exemption as a courtesy, not as access control.
+  for one transaction can skip the fee. Treat the exemption as a courtesy, not as access control. The optional partner
+  collection gives 25% off per token held (up to four) under the same caveat.
 * **Expired trades hold their escrow** until the maker calls `cancelSwap`. Nothing is returned automatically. The UI says so
-  on expired offers and offers a "Reclaim assets" action.
+  on expired offers and offers a "Reclaim assets" action. The maker's fee comes back with it.
 * **Open Counter trades can be taken by anyone**, including bots watching the public feed. An open offer with a low or zero
   ask will be taken by whoever lands first.
-* **The fee is paid by the taker** on top of `wantedMon` (the maker always receives exactly `wantedMon`). A pure NFT-for-NFT
-  trade therefore costs only the taker.
+* **The maker pays the fee** (FoxySwap model): flat, paid when creating the swap on top of any MON escrowed, refunded in full
+  if the swap is cancelled or declined, and kept only when it is accepted. The taker pays exactly `wantedMon` and never a fee.
+  Because the fee is locked in per trade, later fee changes never affect existing trades.
+* **Only verified collections can be traded.** The owner-managed list in the contract is enforced on both sides of every
+  trade, so a hostile token contract cannot take a taker's payment and deliver nothing. A collection removed from the list
+  never traps a trade that already holds its tokens: it can still settle or be cancelled. The list is separate from the
+  indexer's registry; keep them aligned (`VERIFIED_COLLECTIONS` at deploy time, `setVerifiedCollections` afterwards).
 * No ERC-1155, no ERC-2981 royalties, no "any token of a collection" offers: wanted tokens are specific (contract, id) pairs.

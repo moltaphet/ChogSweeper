@@ -24,10 +24,12 @@ $EDITOR .env
 | --- | --- |
 | `MONAD_TESTNET_RPC_URL` | `https://testnet-rpc.monad.xyz/` |
 | `PRIVATE_KEY` | deployer; becomes the initial owner |
-| `PLATFORM_FEE_WEI` | flat taker fee. `0` for free testnet trading; `50000000000000000` = 0.05 MON |
+| `PLATFORM_FEE_WEI` | flat fee the maker pays when creating a swap (refunded if it is cancelled or declined). `0` for free testnet trading; `50000000000000000` = 0.05 MON |
 | `TREASURY_ADDRESS` | fee recipient (default: deployer) |
 | `OWNER_ADDRESS` | optional final owner. Ownership transfer is only **started**; that address must call `acceptOwnership()` |
-| `CHOG_COLLECTION` | use an existing Chog contract for the holder fee exemption. Leave empty to deploy `MockChog` |
+| `CHOG_COLLECTION` | use an existing Chog contract for the holder fee exemption (it is added to the on-chain tradeable list). Leave empty to deploy `MockChog` |
+| `PARTNER_COLLECTION` | optional partner collection: 25% off the fee per token held, up to 4 tokens (also added to the tradeable list) |
+| `TRADEABLE_COLLECTIONS` | comma separated extra collections that may be traded. Only Chog, the partner and these can appear in a trade; owner can change the list later with `setVerifiedCollections` |
 | `DEPLOY_MOCK_CHOG` | default `true` when `CHOG_COLLECTION` is empty |
 | `SEED_MINT_TO`, `SEED_MINT_COUNT` | mint mock Chogs to these wallets right after deploying |
 
@@ -66,6 +68,12 @@ Existing keys in those env files are updated in place; everything else is left a
 * `COLLECTIONS=addr:startBlock:ecosystem,...` for the indexer (becomes the database registry; re-applied on every boot)
 
 To add the official Chog or a partner, append it to the seed file and run `make export`. `startBlock` should be the collection's deploy block.
+
+The seed file only feeds the UI and the indexer. **What can actually be traded is the contract's own list**, which `make deploy` fills from `CHOG_COLLECTION`, `PARTNER_COLLECTION` and `TRADEABLE_COLLECTIONS`. To add one later, the owner calls:
+
+```sh
+cast send $SWEEPER "setVerifiedCollections(address[],bool)" "[0xCollection1,0xCollection2]" true --rpc-url $MONAD_TESTNET_RPC_URL --private-key $OWNER_KEY
+```
 
 ## 4. Verify on-chain
 
@@ -123,7 +131,9 @@ Starts anvil (chain id 10143), deploys with the real script, starts Postgres, th
 
 ## 8. Operating notes
 
-* **Change the fee:** owner calls `setPlatformFee(uint128)`. Promotion: `setFeeWaivedUntil(unixTime)`. Capped at 10 MON.
+* **Change the fee:** owner calls `setPlatformFee(uint128)`. Promotion: `setFeeWaivedUntil(unixTime)`. Capped at 10 MON. Existing trades keep the fee they paid.
+* **Tradeable collections:** owner calls `setVerifiedCollections(address[], bool)`. Keep it aligned with `config/verified-collections.json`; a collection missing on-chain cannot appear in any trade even if the UI lists it.
+* **Partner discount:** `setPartnerCollection(address)`.
 * **Collect fees:** anyone can call `withdrawFees()`; funds only ever go to `treasury`.
 * **Hand over ownership:** `transferOwnership(new)`, then the new owner calls `acceptOwnership()`.
 * **If the export fails with "no receipt yet":** the transactions are still confirming. Wait, then `make export`.

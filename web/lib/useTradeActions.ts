@@ -74,7 +74,7 @@ export function useTradeActions(trade: SwapRecord) {
     canAccept, canDecline, canCancel, requiresReview, isExpired,
     hasActions: canAccept || canDecline || canCancel,
     busy, error,
-    /** Fee on top of the maker's requested MON for this viewer, once quoted. */
+    /** Always zero for the taker: the maker pays the platform fee when creating the trade. Kept so callers need not change. */
     fee: quote.data !== undefined ? quote.data - trade.wantedMon : null,
     totalDue: quote.data ?? null,
     cancel: () => run("cancel", () => send("cancelSwap")),

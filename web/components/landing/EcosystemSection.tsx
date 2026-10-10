@@ -14,7 +14,7 @@ export function EcosystemSection() {
           <p className="eyebrow">Ecosystem</p>
           <h2 id="ecosystem-title" className="h-section mt-1">Ecosystem &amp; verified collections</h2>
           <p className="mt-3 text-monad-muted">
-            Collections in the verified registry carry a badge everywhere in the app. Chog holders trade with no platform fee. Anything not on the list is clearly marked as unverified, but can still be traded.
+            Only collections on the verified list can be traded, and the contract enforces it on both sides. Chog holders create swaps with no platform fee, and the fee is refunded if an offer is cancelled or declined.
           </p>
         </div>
         <Link href={LAUNCHPAD_PATH} className="btn-primary">

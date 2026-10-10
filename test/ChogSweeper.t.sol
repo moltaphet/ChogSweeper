@@ -60,10 +60,11 @@ contract ReentrantParty {
         address taker,
         ChogSweeper.Asset[] calldata offered,
         ChogSweeper.Asset[] calldata wanted,
+        uint128 offeredMon,
         uint128 wantedMon,
         uint64 expiry
     ) external payable returns (uint256) {
-        return sweeper.createSwap{value: msg.value}(taker, offered, wanted, wantedMon, expiry);
+        return sweeper.createSwap{value: msg.value}(taker, offered, wanted, offeredMon, wantedMon, expiry);
     }
 
     function accept(uint256 swapId) external payable {
@@ -97,7 +98,7 @@ contract ReentrantParty {
             data = abi.encodeCall(ChogSweeper.declineSwap, (targetSwapId));
         } else {
             ChogSweeper.Asset[] memory none = new ChogSweeper.Asset[](0);
-            data = abi.encodeCall(ChogSweeper.createSwap, (address(0), none, none, 1, uint64(block.timestamp + 1)));
+            data = abi.encodeCall(ChogSweeper.createSwap, (address(0), none, none, 0, 1, uint64(block.timestamp + 1)));
         }
 
         (bool ok, bytes memory ret) = address(sweeper).call(data);
@@ -151,7 +152,7 @@ contract ReentrantNFT is ERC721 {
 contract MonRejecter {
     function create(ChogSweeper sweeper, ChogSweeper.Asset[] calldata wanted, uint64 expiry) external payable {
         ChogSweeper.Asset[] memory none = new ChogSweeper.Asset[](0);
-        sweeper.createSwap{value: msg.value}(address(0), none, wanted, 0, expiry);
+        sweeper.createSwap{value: msg.value}(address(0), none, wanted, uint128(msg.value), 0, expiry);
     }
 }
 
@@ -180,7 +181,8 @@ contract ChogSweeperTest is Test {
         uint256 offeredMon,
         ChogSweeper.Asset[] wanted,
         uint256 wantedMon,
-        uint64 expiry
+        uint64 expiry,
+        uint256 fee
     );
     event TradeAccepted(uint256 indexed tradeId, address indexed maker, address indexed taker, uint256 fee);
     event TradeDeclined(uint256 indexed tradeId, address indexed maker, address indexed taker);
@@ -191,6 +193,8 @@ contract ChogSweeperTest is Test {
         nftA = new MockNFT("A");
         nftB = new MockNFT("B");
         expiry = uint64(block.timestamp + 1 days);
+        _verify(address(nftA));
+        _verify(address(nftB));
 
         vm.deal(maker, 1_000 ether);
         vm.deal(taker, 1_000 ether);
@@ -203,6 +207,13 @@ contract ChogSweeperTest is Test {
     }
 
     /*----------------------------- helpers -----------------------------*/
+
+    function _verify(address collection) internal {
+        address[] memory list = new address[](1);
+        list[0] = collection;
+        vm.prank(owner);
+        sweeper.setVerifiedCollections(list, true);
+    }
 
     function _assets(MockNFT nft, uint256 start, uint256 count) internal pure returns (ChogSweeper.Asset[] memory a) {
         a = new ChogSweeper.Asset[](count);
@@ -221,15 +232,32 @@ contract ChogSweeperTest is Test {
         }
     }
 
-    /// @dev Maker offers nftA #1 (+ `offeredMon`), wants nftB #1 (+ `wantedMon`).
+    /// @dev Maker offers nftA #1 (+ `offeredMon`), wants nftB #1 (+ `wantedMon`), and pays the current fee on top.
     function _createStandardSwap(address designatedTaker, uint256 offeredMon, uint128 wantedMon)
         internal
         returns (uint256 id)
     {
         nftA.mint(maker, 1);
         nftB.mint(taker, 1);
+        uint256 fee = sweeper.feeFor(maker);
         vm.prank(maker);
-        id = sweeper.createSwap{value: offeredMon}(designatedTaker, _assets(nftA, 1, 1), _assets(nftB, 1, 1), wantedMon, expiry);
+        id = sweeper.createSwap{value: offeredMon + fee}(
+            designatedTaker, _assets(nftA, 1, 1), _assets(nftB, 1, 1), uint128(offeredMon), wantedMon, expiry
+        );
+    }
+
+    /// @dev Creates a swap for `who`, paying `offeredMon` plus the fee that wallet owes right now.
+    function _createFor(
+        address who,
+        address designatedTaker,
+        ChogSweeper.Asset[] memory off,
+        ChogSweeper.Asset[] memory want,
+        uint128 offeredMon,
+        uint128 wantedMon
+    ) internal returns (uint256 id) {
+        uint256 fee = sweeper.feeFor(who);
+        vm.prank(who);
+        id = sweeper.createSwap{value: uint256(offeredMon) + fee}(designatedTaker, off, want, offeredMon, wantedMon, expiry);
     }
 
     /*------------------------- happy paths -----------------------------*/
@@ -247,7 +275,7 @@ contract ChogSweeperTest is Test {
         assertEq(nftA.ownerOf(1), taker);
         assertEq(nftB.ownerOf(1), maker);
         assertEq(address(sweeper).balance, 0);
-        (,, ChogSweeper.Status status,,,, ChogSweeper.Asset[] memory off, ChogSweeper.Asset[] memory wan) =
+        (,, ChogSweeper.Status status,,,,, ChogSweeper.Asset[] memory off, ChogSweeper.Asset[] memory wan) =
             sweeper.getTrade(id);
         assertEq(uint8(status), uint8(ChogSweeper.Status.Accepted));
         assertEq(off.length, 0);
@@ -261,9 +289,9 @@ contract ChogSweeperTest is Test {
         ChogSweeper.Asset[] memory wan = _assets(nftB, 1, 1);
 
         vm.expectEmit(true, true, true, true, address(sweeper));
-        emit TradeCreated(1, maker, taker, off, 2 ether, wan, 3 ether, expiry);
+        emit TradeCreated(1, maker, taker, off, 2 ether, wan, 3 ether, expiry, 0);
         vm.prank(maker);
-        sweeper.createSwap{value: 2 ether}(taker, off, wan, 3 ether, expiry);
+        sweeper.createSwap{value: 2 ether}(taker, off, wan, 2 ether, 3 ether, expiry);
     }
 
     function test_NftPlusMonForNftPlusMon() public {
@@ -285,7 +313,7 @@ contract ChogSweeperTest is Test {
     function test_MonOnlyForNft() public {
         nftB.mint(taker, 7);
         vm.prank(maker);
-        uint256 id = sweeper.createSwap{value: 10 ether}(address(0), _none(), _assets(nftB, 7, 1), 0, expiry);
+        uint256 id = sweeper.createSwap{value: 10 ether}(address(0), _none(), _assets(nftB, 7, 1), 10 ether, 0, expiry);
 
         vm.prank(taker);
         sweeper.acceptSwap(id);
@@ -298,7 +326,7 @@ contract ChogSweeperTest is Test {
     function test_NftForMonOnly() public {
         nftA.mint(maker, 4);
         vm.prank(maker);
-        uint256 id = sweeper.createSwap(address(0), _assets(nftA, 4, 1), _none(), 2 ether, expiry);
+        uint256 id = sweeper.createSwap(address(0), _assets(nftA, 4, 1), _none(), 0, 2 ether, expiry);
 
         vm.prank(stranger);
         sweeper.acceptSwap{value: 2 ether}(id);
@@ -312,7 +340,7 @@ contract ChogSweeperTest is Test {
         uint256 id = _createStandardSwap(address(0), 0, 0);
         vm.prank(taker);
         sweeper.acceptSwap(id);
-        (, address recorded,,,,,,) = sweeper.getTrade(id);
+        (, address recorded,,,,,,,) = sweeper.getTrade(id);
         assertEq(recorded, taker);
     }
 
@@ -320,8 +348,8 @@ contract ChogSweeperTest is Test {
         nftA.mint(maker, 1);
         nftA.mint(maker, 2);
         vm.startPrank(maker);
-        uint256 id1 = sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 1, expiry);
-        uint256 id2 = sweeper.createSwap(address(0), _assets(nftA, 2, 1), _none(), 1, expiry);
+        uint256 id1 = sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 0, 1, expiry);
+        uint256 id2 = sweeper.createSwap(address(0), _assets(nftA, 2, 1), _none(), 0, 1, expiry);
         vm.stopPrank();
         assertEq(id1, 1);
         assertEq(id2, 2);
@@ -334,7 +362,7 @@ contract ChogSweeperTest is Test {
         _mintRange(nftB, taker, 200, max);
 
         vm.prank(maker);
-        uint256 id = sweeper.createSwap(address(0), _assets(nftA, 100, max), _assets(nftB, 200, max), 0, expiry);
+        uint256 id = sweeper.createSwap(address(0), _assets(nftA, 100, max), _assets(nftB, 200, max), 0, 0, expiry);
         vm.prank(taker);
         sweeper.acceptSwap(id);
 
@@ -358,7 +386,7 @@ contract ChogSweeperTest is Test {
         off[1] = ChogSweeper.Asset(address(nftB), 1);
 
         vm.prank(maker);
-        uint256 id = sweeper.createSwap(taker, off, _assets(nftA, 2, 1), 0, expiry);
+        uint256 id = sweeper.createSwap(taker, off, _assets(nftA, 2, 1), 0, 0, expiry);
         vm.prank(taker);
         sweeper.acceptSwap(id);
 
@@ -381,7 +409,7 @@ contract ChogSweeperTest is Test {
         assertEq(nftA.ownerOf(1), maker);
         assertEq(maker.balance, makerBefore);
         assertEq(address(sweeper).balance, 0);
-        (,, ChogSweeper.Status status,,,,,) = sweeper.getTrade(id);
+        (,, ChogSweeper.Status status,,,,,,) = sweeper.getTrade(id);
         assertEq(uint8(status), uint8(ChogSweeper.Status.Cancelled));
     }
 
@@ -471,7 +499,7 @@ contract ChogSweeperTest is Test {
         nftA.mint(maker, 1);
         vm.prank(maker);
         vm.expectRevert(ChogSweeper.SelfTrade.selector);
-        sweeper.createSwap(maker, _assets(nftA, 1, 1), _none(), 1, expiry);
+        sweeper.createSwap(maker, _assets(nftA, 1, 1), _none(), 0, 1, expiry);
     }
 
     function test_AcceptWithoutApprovalReverts() public {
@@ -483,7 +511,7 @@ contract ChogSweeperTest is Test {
         sweeper.acceptSwap(id);
         // Nothing moved and the swap is still open.
         assertEq(nftA.ownerOf(1), address(sweeper));
-        (,, ChogSweeper.Status status,,,,,) = sweeper.getTrade(id);
+        (,, ChogSweeper.Status status,,,,,,) = sweeper.getTrade(id);
         assertEq(uint8(status), uint8(ChogSweeper.Status.Active));
     }
 
@@ -535,16 +563,16 @@ contract ChogSweeperTest is Test {
         nftA.mint(maker, 1);
         vm.startPrank(maker);
         vm.expectRevert(ChogSweeper.InvalidExpiry.selector);
-        sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 1, uint64(block.timestamp));
+        sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 0, 1, uint64(block.timestamp));
         vm.expectRevert(ChogSweeper.InvalidExpiry.selector);
-        sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 1, 0);
+        sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 0, 1, 0);
         vm.stopPrank();
     }
 
     function test_CreateWithNextSecondExpirySucceeds() public {
         nftA.mint(maker, 1);
         vm.prank(maker);
-        sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 1, uint64(block.timestamp + 1));
+        sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 0, 1, uint64(block.timestamp + 1));
     }
 
     function testFuzz_ExpiryBoundary(uint64 delta, uint64 warpBy) public {
@@ -553,7 +581,7 @@ contract ChogSweeperTest is Test {
         nftA.mint(maker, 1);
         uint64 exp = uint64(block.timestamp) + delta;
         vm.prank(maker);
-        uint256 id = sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 1, exp);
+        uint256 id = sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 0, 1, exp);
 
         vm.warp(block.timestamp + warpBy);
         vm.prank(taker);
@@ -570,7 +598,7 @@ contract ChogSweeperTest is Test {
         _mintRange(nftA, maker, 100, over);
         vm.prank(maker);
         vm.expectRevert(ChogSweeper.TooManyAssets.selector);
-        sweeper.createSwap(address(0), _assets(nftA, 100, over), _none(), 1, expiry);
+        sweeper.createSwap(address(0), _assets(nftA, 100, over), _none(), 0, 1, expiry);
     }
 
     function test_TooManyWantedReverts() public {
@@ -578,19 +606,19 @@ contract ChogSweeperTest is Test {
         nftA.mint(maker, 1);
         vm.prank(maker);
         vm.expectRevert(ChogSweeper.TooManyAssets.selector);
-        sweeper.createSwap(address(0), _assets(nftA, 1, 1), _assets(nftB, 200, over), 0, expiry);
+        sweeper.createSwap(address(0), _assets(nftA, 1, 1), _assets(nftB, 200, over), 0, 0, expiry);
     }
 
     function test_NothingOfferedReverts() public {
         vm.prank(maker);
         vm.expectRevert(ChogSweeper.NothingOffered.selector);
-        sweeper.createSwap(address(0), _none(), _assets(nftB, 1, 1), 0, expiry);
+        sweeper.createSwap(address(0), _none(), _assets(nftB, 1, 1), 0, 0, expiry);
     }
 
     function test_PureGift_NoWantedAssetsAndNoMon() public {
         nftA.mint(maker, 1);
         vm.prank(maker);
-        uint256 id = sweeper.createSwap(taker, _assets(nftA, 1, 1), _none(), 0, expiry);
+        uint256 id = sweeper.createSwap(taker, _assets(nftA, 1, 1), _none(), 0, 0, expiry);
 
         vm.prank(taker);
         sweeper.acceptSwap(id);
@@ -603,7 +631,7 @@ contract ChogSweeperTest is Test {
         nftA.mint(stranger, 1);
         vm.prank(maker);
         vm.expectRevert();
-        sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 1, expiry);
+        sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 0, 1, expiry);
     }
 
     function test_CreateWithoutApprovalReverts() public {
@@ -612,32 +640,45 @@ contract ChogSweeperTest is Test {
         nftA.setApprovalForAll(address(sweeper), false);
         vm.prank(maker);
         vm.expectRevert();
-        sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 1, expiry);
+        sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 0, 1, expiry);
     }
 
-    function test_OfferedAddressWithoutCodeReverts() public {
+    function test_OfferedUnverifiedCollectionReverts() public {
+        address eoa = makeAddr("eoa");
         ChogSweeper.Asset[] memory off = new ChogSweeper.Asset[](1);
-        off[0] = ChogSweeper.Asset(makeAddr("eoa"), 1);
+        off[0] = ChogSweeper.Asset(eoa, 1);
         vm.prank(maker);
-        vm.expectRevert();
-        sweeper.createSwap(address(0), off, _none(), 1, expiry);
+        vm.expectRevert(abi.encodeWithSelector(ChogSweeper.UnverifiedCollection.selector, eoa));
+        sweeper.createSwap(address(0), off, _none(), 0, 1, expiry);
     }
 
-    function test_WantedAddressWithoutCodeReverts() public {
+    function test_WantedUnverifiedCollectionReverts() public {
+        address eoa = makeAddr("eoa");
         ChogSweeper.Asset[] memory wan = new ChogSweeper.Asset[](1);
-        wan[0] = ChogSweeper.Asset(makeAddr("eoa"), 1);
+        wan[0] = ChogSweeper.Asset(eoa, 1);
         vm.prank(maker);
-        vm.expectRevert(ChogSweeper.InvalidAsset.selector);
-        sweeper.createSwap{value: 1 ether}(address(0), _none(), wan, 0, expiry);
+        vm.expectRevert(abi.encodeWithSelector(ChogSweeper.UnverifiedCollection.selector, eoa));
+        sweeper.createSwap{value: 1 ether}(address(0), _none(), wan, 1 ether, 0, expiry);
     }
 
-    function test_FakeNftThatSkipsTransferIsRejected() public {
+    function test_HostileCollectionIsRejectedUntilTheOwnerVerifiesIt() public {
         FakeNFT fake = new FakeNFT();
         ChogSweeper.Asset[] memory off = new ChogSweeper.Asset[](1);
         off[0] = ChogSweeper.Asset(address(fake), 1);
         vm.prank(maker);
+        vm.expectRevert(abi.encodeWithSelector(ChogSweeper.UnverifiedCollection.selector, address(fake)));
+        sweeper.createSwap(address(0), off, _none(), 0, 1, expiry);
+    }
+
+    function test_FakeNftThatSkipsTransferIsRejected() public {
+        // even if a hostile collection slips onto the verified list, the post-deposit ownerOf check still catches it
+        FakeNFT fake = new FakeNFT();
+        _verify(address(fake));
+        ChogSweeper.Asset[] memory off = new ChogSweeper.Asset[](1);
+        off[0] = ChogSweeper.Asset(address(fake), 1);
+        vm.prank(maker);
         vm.expectRevert(ChogSweeper.EscrowDepositFailed.selector);
-        sweeper.createSwap(address(0), off, _none(), 1, expiry);
+        sweeper.createSwap(address(0), off, _none(), 0, 1, expiry);
     }
 
     function test_DuplicateOfferedTokenReverts() public {
@@ -647,15 +688,18 @@ contract ChogSweeperTest is Test {
         off[1] = ChogSweeper.Asset(address(nftA), 1);
         vm.prank(maker);
         vm.expectRevert();
-        sweeper.createSwap(address(0), off, _none(), 1, expiry);
+        sweeper.createSwap(address(0), off, _none(), 0, 1, expiry);
     }
 
-    function test_MonAboveUint128Reverts() public {
-        uint256 huge = uint256(type(uint128).max) + 1;
-        vm.deal(maker, huge);
-        vm.prank(maker);
-        vm.expectRevert(ChogSweeper.AmountTooLarge.selector);
-        sweeper.createSwap{value: huge}(address(0), _none(), _assets(nftB, 1, 1), 0, expiry);
+    function test_CreateWithWrongValueReverts() public {
+        nftA.mint(maker, 1);
+        // fee is 0 here, so the value must equal offeredMon exactly, in both directions
+        vm.startPrank(maker);
+        vm.expectRevert(ChogSweeper.WrongValue.selector);
+        sweeper.createSwap{value: 1 ether}(address(0), _assets(nftA, 1, 1), _none(), 0, 0, expiry);
+        vm.expectRevert(ChogSweeper.WrongValue.selector);
+        sweeper.createSwap{value: 1 ether - 1}(address(0), _assets(nftA, 1, 1), _none(), 1 ether, 0, expiry);
+        vm.stopPrank();
     }
 
     function test_RejectsStrayNativeTransfers() public {
@@ -688,9 +732,7 @@ contract ChogSweeperTest is Test {
         uint256 takerBefore = taker.balance;
 
         vm.prank(maker);
-        uint256 id = sweeper.createSwap{value: offeredMon}(
-            taker, _assets(nftA, 1, 1), _assets(nftB, 1, 1), wantedMon, expiry
-        );
+        uint256 id = sweeper.createSwap{value: offeredMon}(taker, _assets(nftA, 1, 1), _assets(nftB, 1, 1), offeredMon, wantedMon, expiry);
         assertEq(address(sweeper).balance, offeredMon);
 
         vm.prank(taker);
@@ -711,8 +753,8 @@ contract ChogSweeperTest is Test {
 
         nftA.mint(maker, 1);
         vm.prank(maker);
-        uint256 id = sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), wantedMon == 0 ? 1 : wantedMon, expiry);
-        (,,,,, uint256 required,,) = sweeper.getTrade(id);
+        uint256 id = sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 0, wantedMon == 0 ? 1 : wantedMon, expiry);
+        (,,,,, uint256 required,,,) = sweeper.getTrade(id);
 
         vm.prank(taker);
         if (sent != required) vm.expectRevert(ChogSweeper.WrongValue.selector);
@@ -724,7 +766,7 @@ contract ChogSweeperTest is Test {
         vm.deal(maker, offeredMon);
 
         vm.startPrank(maker);
-        uint256 id = sweeper.createSwap{value: offeredMon}(address(0), _none(), _assets(nftB, 1, 1), 0, expiry);
+        uint256 id = sweeper.createSwap{value: offeredMon}(address(0), _none(), _assets(nftB, 1, 1), offeredMon, 0, expiry);
         assertEq(maker.balance, 0);
         sweeper.cancelSwap(id);
         vm.stopPrank();
@@ -747,7 +789,7 @@ contract ChogSweeperTest is Test {
 
         vm.prank(maker);
         uint256 id =
-            sweeper.createSwap{value: offeredMon}(address(0), _assets(nftA, 1000, o), _assets(nftB, 2000, w), wantedMon, expiry);
+            sweeper.createSwap{value: offeredMon}(address(0), _assets(nftA, 1000, o), _assets(nftB, 2000, w), uint128(offeredMon), wantedMon, expiry);
         vm.prank(taker);
         sweeper.acceptSwap{value: wantedMon}(id);
 
@@ -786,10 +828,10 @@ contract ChogSweeperTest is Test {
         // Victim swap the attacker would like to drain on re-entry.
         nftA.mint(maker, 1);
         vm.prank(maker);
-        uint256 victimId = sweeper.createSwap{value: 5 ether}(address(0), _assets(nftA, 1, 1), _none(), 1 ether, expiry);
+        uint256 victimId = sweeper.createSwap{value: 5 ether}(address(0), _assets(nftA, 1, 1), _none(), 5 ether, 1 ether, expiry);
         nftA.mint(maker, 2);
         vm.prank(maker);
-        uint256 payoutId = sweeper.createSwap{value: 2 ether}(address(0), _assets(nftA, 2, 1), _none(), 1 ether, expiry);
+        uint256 payoutId = sweeper.createSwap{value: 2 ether}(address(0), _assets(nftA, 2, 1), _none(), 2 ether, 1 ether, expiry);
 
         attacker.configure(ReentrantParty.Mode.ReenterAccept, victimId, false);
         vm.expectRevert(ChogSweeper.TransferFailed.selector);
@@ -808,10 +850,10 @@ contract ChogSweeperTest is Test {
 
         nftA.mint(maker, 1);
         vm.prank(maker);
-        uint256 victimId = sweeper.createSwap{value: 5 ether}(address(0), _assets(nftA, 1, 1), _none(), 1 ether, expiry);
+        uint256 victimId = sweeper.createSwap{value: 5 ether}(address(0), _assets(nftA, 1, 1), _none(), 5 ether, 1 ether, expiry);
         nftA.mint(maker, 2);
         vm.prank(maker);
-        uint256 payoutId = sweeper.createSwap{value: 2 ether}(address(0), _assets(nftA, 2, 1), _none(), 1 ether, expiry);
+        uint256 payoutId = sweeper.createSwap{value: 2 ether}(address(0), _assets(nftA, 2, 1), _none(), 2 ether, 1 ether, expiry);
 
         attacker.configure(ReentrantParty.Mode.ReenterAccept, victimId, true);
         attacker.accept{value: 1 ether}(payoutId);
@@ -831,7 +873,7 @@ contract ChogSweeperTest is Test {
 
         nftA.mint(maker, 1);
         vm.prank(maker);
-        uint256 id = sweeper.createSwap{value: 2 ether}(address(0), _assets(nftA, 1, 1), _none(), 1 ether, expiry);
+        uint256 id = sweeper.createSwap{value: 2 ether}(address(0), _assets(nftA, 1, 1), _none(), 2 ether, 1 ether, expiry);
 
         attacker.configure(ReentrantParty.Mode.ReenterCancel, id, true);
         attacker.accept{value: 1 ether}(id);
@@ -848,7 +890,7 @@ contract ChogSweeperTest is Test {
 
         nftA.mint(address(evilMaker), 1);
         evilMaker.approveAll(address(nftA));
-        uint256 id = evilMaker.create(address(0), _assets(nftA, 1, 1), _none(), 1 ether, expiry);
+        uint256 id = evilMaker.create(address(0), _assets(nftA, 1, 1), _none(), 0, 1 ether, expiry);
 
         evilMaker.configure(ReentrantParty.Mode.ReenterCancel, id, false);
         vm.prank(taker);
@@ -866,7 +908,7 @@ contract ChogSweeperTest is Test {
         ReentrantParty evilMaker = new ReentrantParty(sweeper);
         nftA.mint(address(evilMaker), 1);
         evilMaker.approveAll(address(nftA));
-        uint256 id = evilMaker.create(address(0), _assets(nftA, 1, 1), _none(), 1 ether, expiry);
+        uint256 id = evilMaker.create(address(0), _assets(nftA, 1, 1), _none(), 0, 1 ether, expiry);
 
         evilMaker.configure(ReentrantParty.Mode.ReenterCancel, id, true);
         vm.prank(taker);
@@ -882,7 +924,7 @@ contract ChogSweeperTest is Test {
     function test_Reentrancy_MakerReentersCreateOnCancelRefund_Blocked() public {
         ReentrantParty evilMaker = new ReentrantParty(sweeper);
         vm.deal(address(evilMaker), 5 ether);
-        uint256 id = evilMaker.create{value: 5 ether}(address(0), _none(), _assets(nftB, 1, 1), 0, expiry);
+        uint256 id = evilMaker.create{value: 5 ether}(address(0), _none(), _assets(nftB, 1, 1), 5 ether, 0, expiry);
 
         evilMaker.configure(ReentrantParty.Mode.ReenterCreate, 0, true);
         evilMaker.cancel(id);
@@ -898,6 +940,7 @@ contract ChogSweeperTest is Test {
     /// by the guard, and the outer settlement must still complete exactly once.
     function test_Reentrancy_HostileNftOnAcceptRelease_Blocked() public {
         ReentrantNFT evil = new ReentrantNFT();
+        _verify(address(evil));
         evil.mint(maker, 1);
         vm.prank(maker);
         evil.setApprovalForAll(address(sweeper), true);
@@ -905,7 +948,7 @@ contract ChogSweeperTest is Test {
         ChogSweeper.Asset[] memory off = new ChogSweeper.Asset[](1);
         off[0] = ChogSweeper.Asset(address(evil), 1);
         vm.prank(maker);
-        uint256 id = sweeper.createSwap(address(0), off, _none(), 1 ether, expiry);
+        uint256 id = sweeper.createSwap(address(0), off, _none(), 0, 1 ether, expiry);
 
         evil.arm(address(sweeper), abi.encodeCall(ChogSweeper.cancelSwap, (id)));
         vm.prank(taker);
@@ -921,6 +964,7 @@ contract ChogSweeperTest is Test {
     /// A hostile wanted-side ERC-721 re-enters `acceptSwap` while the taker's token is pulled.
     function test_Reentrancy_HostileNftOnTakerPull_Blocked() public {
         ReentrantNFT evil = new ReentrantNFT();
+        _verify(address(evil));
         evil.mint(taker, 1);
         vm.prank(taker);
         evil.setApprovalForAll(address(sweeper), true);
@@ -929,7 +973,7 @@ contract ChogSweeperTest is Test {
         ChogSweeper.Asset[] memory wan = new ChogSweeper.Asset[](1);
         wan[0] = ChogSweeper.Asset(address(evil), 1);
         vm.prank(maker);
-        uint256 id = sweeper.createSwap(address(0), _assets(nftA, 1, 1), wan, 0, expiry);
+        uint256 id = sweeper.createSwap(address(0), _assets(nftA, 1, 1), wan, 0, 0, expiry);
 
         evil.arm(address(sweeper), abi.encodeCall(ChogSweeper.acceptSwap, (id)));
         vm.prank(taker);
@@ -943,6 +987,7 @@ contract ChogSweeperTest is Test {
     /// A hostile NFT re-enters `createSwap` while being pulled into escrow.
     function test_Reentrancy_HostileNftDuringCreate_Blocked() public {
         ReentrantNFT evil = new ReentrantNFT();
+        _verify(address(evil));
         evil.mint(maker, 1);
         vm.prank(maker);
         evil.setApprovalForAll(address(sweeper), true);
@@ -950,11 +995,11 @@ contract ChogSweeperTest is Test {
         ChogSweeper.Asset[] memory off = new ChogSweeper.Asset[](1);
         off[0] = ChogSweeper.Asset(address(evil), 1);
         evil.arm(
-            address(sweeper), abi.encodeCall(ChogSweeper.createSwap, (address(0), _none(), _none(), 1, uint64(block.timestamp + 1)))
+            address(sweeper), abi.encodeCall(ChogSweeper.createSwap, (address(0), _none(), _none(), 0, 1, uint64(block.timestamp + 1)))
         );
 
         vm.prank(maker);
-        sweeper.createSwap(address(0), off, _none(), 1, expiry);
+        sweeper.createSwap(address(0), off, _none(), 0, 1, expiry);
 
         assertTrue(evil.blocked());
         assertEq(sweeper.tradeCount(), 1);
@@ -972,7 +1017,7 @@ contract ChogSweeperTest is Test {
         ChogSweeper.Asset[] memory wan = _assets(nftB, 9, 1);
         // wantedMon > 0 cannot be set via MonRejecter.create (passes 0), so build directly.
         vm.prank(address(rejecter));
-        uint256 id = sweeper.createSwap{value: 1 ether}(address(0), _none(), wan, 1 ether, expiry);
+        uint256 id = sweeper.createSwap{value: 1 ether}(address(0), _none(), wan, 1 ether, 1 ether, expiry);
 
         vm.prank(taker);
         vm.expectRevert(ChogSweeper.TransferFailed.selector);
@@ -1003,67 +1048,103 @@ contract ChogSweeperTest is Test {
         new ChogSweeper(owner, treasury, tooHigh);
     }
 
-    function test_Fee_TakerPaysOnTop_MakerReceivesExactly() public {
+    function test_Fee_MakerPaysOnTop_TakerPaysExactly() public {
         _setFee(0.5 ether);
-        uint256 id = _createStandardSwap(address(0), 5 ether, 3 ether);
         uint256 makerBefore = maker.balance;
         uint256 takerBefore = taker.balance;
-
-        assertEq(sweeper.quoteAcceptance(id, taker), 3.5 ether);
+        uint256 id = _createStandardSwap(address(0), 5 ether, 3 ether);
+        assertEq(address(sweeper).balance, 5.5 ether); // escrowed MON + the fee
+        (,,,,,, uint256 tradeFee,,) = sweeper.getTrade(id);
+        assertEq(tradeFee, 0.5 ether);
+        assertEq(sweeper.quoteAcceptance(id, taker), 3 ether); // the taker pays no fee
 
         vm.expectEmit(true, true, true, true, address(sweeper));
         emit TradeAccepted(id, maker, taker, 0.5 ether);
         vm.prank(taker);
-        sweeper.acceptSwap{value: 3.5 ether}(id);
+        sweeper.acceptSwap{value: 3 ether}(id);
 
-        assertEq(maker.balance, makerBefore + 3 ether);
-        assertEq(taker.balance, takerBefore - 3.5 ether + 5 ether);
+        assertEq(maker.balance, makerBefore - 5 ether - 0.5 ether + 3 ether);
+        assertEq(taker.balance, takerBefore - 3 ether + 5 ether);
         assertEq(sweeper.accruedFees(), 0.5 ether);
         assertEq(address(sweeper).balance, 0.5 ether);
     }
 
-    function test_Fee_PureNftTradeStillPaysFee() public {
+    function test_Fee_PureNftTradeMakerPaysFee() public {
         _setFee(1 ether);
+        uint256 makerBefore = maker.balance;
         uint256 id = _createStandardSwap(address(0), 0, 0);
+        assertEq(address(sweeper).balance, 1 ether);
+        assertEq(maker.balance, makerBefore - 1 ether);
         vm.prank(taker);
         vm.expectRevert(ChogSweeper.WrongValue.selector);
-        sweeper.acceptSwap(id);
+        sweeper.acceptSwap{value: 1 ether}(id); // the taker must not pay the fee
         vm.prank(taker);
-        sweeper.acceptSwap{value: 1 ether}(id);
+        sweeper.acceptSwap(id);
         assertEq(sweeper.accruedFees(), 1 ether);
     }
 
-    function test_Fee_WrongValueAlwaysReverts() public {
+    function test_Fee_CreateWrongValueAlwaysReverts() public {
+        _setFee(1 ether);
+        nftA.mint(maker, 1);
+        vm.startPrank(maker);
+        vm.expectRevert(ChogSweeper.WrongValue.selector);
+        sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 0, 0, expiry); // forgot the fee
+        vm.expectRevert(ChogSweeper.WrongValue.selector);
+        sweeper.createSwap{value: 1 ether + 1}(address(0), _assets(nftA, 1, 1), _none(), 0, 0, expiry); // overpaying is refused
+        vm.expectRevert(ChogSweeper.WrongValue.selector);
+        sweeper.createSwap{value: 2 ether}(address(0), _none(), _none(), 2 ether, 0, expiry); // MON offer without the fee
+        vm.stopPrank();
+    }
+
+    function test_Fee_AcceptWrongValueAlwaysReverts() public {
         _setFee(1 ether);
         uint256 id = _createStandardSwap(address(0), 0, 2 ether);
         vm.startPrank(taker);
         vm.expectRevert(ChogSweeper.WrongValue.selector);
-        sweeper.acceptSwap{value: 2 ether}(id); // forgot the fee
+        sweeper.acceptSwap{value: 2 ether - 1}(id);
         vm.expectRevert(ChogSweeper.WrongValue.selector);
-        sweeper.acceptSwap{value: 3 ether + 1}(id); // overpaying is refused, not kept
+        sweeper.acceptSwap{value: 2 ether + 1}(id);
+        vm.expectRevert(ChogSweeper.WrongValue.selector);
+        sweeper.acceptSwap{value: 3 ether}(id); // wantedMon + fee is NOT what the taker owes
         vm.stopPrank();
     }
 
     function test_Fee_RaisedWhileTxPending_RevertsInsteadOfOvercharging() public {
         _setFee(1 ether);
-        uint256 id = _createStandardSwap(address(0), 0, 0);
+        nftA.mint(maker, 1);
+        uint256 quoted = sweeper.quoteCreation(maker, 0);
+        assertEq(quoted, 1 ether);
         _setFee(2 ether);
-        vm.prank(taker);
+        vm.prank(maker);
         vm.expectRevert(ChogSweeper.WrongValue.selector);
-        sweeper.acceptSwap{value: 1 ether}(id);
+        sweeper.createSwap{value: quoted}(address(0), _assets(nftA, 1, 1), _none(), 0, 0, expiry);
     }
 
-    function test_Fee_ChogHolderPaysNothing() public {
-        MockNFT chog = new MockNFT("Chog");
-        vm.prank(owner);
-        sweeper.setChogCollection(address(chog));
+    function test_Fee_ExistingTradeKeepsTheFeeItPaid() public {
         _setFee(1 ether);
-        chog.mint(taker, 1);
+        uint256 id = _createStandardSwap(address(0), 0, 0);
+        _setFee(5 ether);
+        uint256 before = maker.balance;
+        vm.prank(maker);
+        sweeper.cancelSwap(id);
+        assertEq(maker.balance, before + 1 ether); // exactly what was paid, not the new fee
+        assertEq(address(sweeper).balance, 0);
+    }
 
-        assertEq(sweeper.feeFor(taker), 0);
+    function test_Fee_ChogHolderMakerPaysNothing() public {
+        MockNFT chog = new MockNFT("Chog");
+        vm.startPrank(owner);
+        sweeper.setChogCollection(address(chog));
+        vm.stopPrank();
+        _setFee(1 ether);
+        chog.mint(maker, 1);
+
+        assertEq(sweeper.feeFor(maker), 0);
         assertEq(sweeper.feeFor(stranger), 1 ether);
+        assertEq(sweeper.quoteCreation(maker, 3 ether), 3 ether);
 
         uint256 id = _createStandardSwap(address(0), 0, 0);
+        assertEq(address(sweeper).balance, 0);
         vm.prank(taker);
         sweeper.acceptSwap(id);
         assertEq(sweeper.accruedFees(), 0);
@@ -1074,31 +1155,59 @@ contract ChogSweeperTest is Test {
         vm.prank(owner);
         sweeper.setChogCollection(address(chog));
         _setFee(1 ether);
-        chog.mint(taker, 1);
-        vm.prank(taker);
-        chog.transferFrom(taker, stranger, 1);
-        assertEq(sweeper.feeFor(taker), 1 ether);
+        chog.mint(maker, 1);
+        assertEq(sweeper.feeFor(maker), 0);
+        vm.prank(maker);
+        chog.transferFrom(maker, stranger, 1);
+        assertEq(sweeper.feeFor(maker), 1 ether);
     }
 
-    function test_Fee_NonHolderPaysWhileHolderDoesNot_SameBlock() public {
-        MockNFT chog = new MockNFT("Chog");
+    function test_Fee_PartnerTiers_QuarterOffPerToken_CappedAtFour() public {
+        MockNFT partner = new MockNFT("Partner");
         vm.prank(owner);
-        sweeper.setChogCollection(address(chog));
+        sweeper.setPartnerCollection(address(partner));
         _setFee(1 ether);
-        chog.mint(stranger, 1);
 
-        nftA.mint(maker, 1);
-        nftA.mint(maker, 2);
-        vm.startPrank(maker);
-        uint256 id1 = sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 0, expiry);
-        uint256 id2 = sweeper.createSwap(address(0), _assets(nftA, 2, 1), _none(), 0, expiry);
+        uint256[6] memory expected = [uint256(1 ether), 0.75 ether, 0.5 ether, 0.25 ether, 0, 0];
+        for (uint256 held; held < expected.length; ++held) {
+            if (held > 0) partner.mint(maker, held);
+            assertEq(sweeper.feeFor(maker), expected[held], "tier fee");
+        }
+        assertEq(sweeper.quoteCreation(maker, 5), 5);
+
+        vm.prank(owner);
+        sweeper.setPartnerCollection(address(0));
+        assertEq(sweeper.feeFor(maker), 1 ether);
+    }
+
+    function test_Fee_PartnerTierIsRecordedAndRefunded() public {
+        MockNFT partner = new MockNFT("Partner");
+        vm.prank(owner);
+        sweeper.setPartnerCollection(address(partner));
+        _setFee(1 ether);
+        partner.mint(maker, 1);
+        partner.mint(maker, 2); // two tokens: 50% off
+
+        uint256 id = _createStandardSwap(address(0), 0, 0);
+        (,,,,,, uint256 tradeFee,,) = sweeper.getTrade(id);
+        assertEq(tradeFee, 0.5 ether);
+        assertEq(address(sweeper).balance, 0.5 ether);
+        vm.prank(maker);
+        sweeper.cancelSwap(id);
+        assertEq(address(sweeper).balance, 0);
+    }
+
+    function test_Fee_ChogBeatsPartnerTier() public {
+        MockNFT chog = new MockNFT("Chog");
+        MockNFT partner = new MockNFT("Partner");
+        vm.startPrank(owner);
+        sweeper.setChogCollection(address(chog));
+        sweeper.setPartnerCollection(address(partner));
         vm.stopPrank();
-
-        vm.prank(stranger);
-        sweeper.acceptSwap(id1);
-        vm.prank(taker);
-        sweeper.acceptSwap{value: 1 ether}(id2);
-        assertEq(sweeper.accruedFees(), 1 ether);
+        _setFee(1 ether);
+        chog.mint(maker, 1);
+        partner.mint(maker, 1);
+        assertEq(sweeper.feeFor(maker), 0);
     }
 
     function test_Fee_PromotionWindowIsInclusive() public {
@@ -1107,27 +1216,28 @@ contract ChogSweeperTest is Test {
         vm.prank(owner);
         sweeper.setFeeWaivedUntil(until);
 
-        uint256 id = _createStandardSwap(address(0), 0, 0);
         vm.warp(until);
-        assertEq(sweeper.feeFor(taker), 0);
+        assertEq(sweeper.feeFor(maker), 0);
+        uint256 id = _createStandardSwap(address(0), 0, 0);
+        assertEq(address(sweeper).balance, 0);
         vm.prank(taker);
         sweeper.acceptSwap(id);
 
         vm.warp(until + 1);
-        assertEq(sweeper.feeFor(taker), 1 ether);
+        assertEq(sweeper.feeFor(maker), 1 ether);
     }
 
     function test_Fee_PromotionCanBeEndedEarly() public {
         _setFee(1 ether);
         vm.startPrank(owner);
         sweeper.setFeeWaivedUntil(uint64(block.timestamp + 30 days));
-        assertEq(sweeper.feeFor(taker), 0);
+        assertEq(sweeper.feeFor(maker), 0);
         sweeper.setFeeWaivedUntil(0);
         vm.stopPrank();
-        assertEq(sweeper.feeFor(taker), 1 ether);
+        assertEq(sweeper.feeFor(maker), 1 ether);
     }
 
-    function test_Fee_HostileChogContracts_NeverBlockAcceptance() public {
+    function test_Fee_HostileChogContracts_NeverBlockCreation() public {
         _setFee(1 ether);
         address[4] memory hostile = [
             address(new RevertingChog()),
@@ -1136,17 +1246,19 @@ contract ChogSweeperTest is Test {
             makeAddr("eoaAsChog")
         ];
         for (uint256 i; i < hostile.length; ++i) {
-            vm.prank(owner);
+            vm.startPrank(owner);
             sweeper.setChogCollection(hostile[i]);
-            assertEq(sweeper.feeFor(taker), 1 ether, "treated as non-holder");
+            sweeper.setPartnerCollection(hostile[i]);
+            vm.stopPrank();
+            assertEq(sweeper.feeFor(maker), 1 ether, "treated as non-holder");
         }
 
-        // Settlement works end to end with the gas burner configured.
+        // Creation and settlement work end to end with the gas burner configured.
         vm.prank(owner);
         sweeper.setChogCollection(hostile[1]);
         uint256 id = _createStandardSwap(address(0), 0, 0);
         vm.prank(taker);
-        sweeper.acceptSwap{value: 1 ether}(id);
+        sweeper.acceptSwap(id);
         assertEq(nftA.ownerOf(1), taker);
     }
 
@@ -1156,15 +1268,15 @@ contract ChogSweeperTest is Test {
         vm.prank(owner);
         sweeper.setChogCollection(burner);
         uint256 g = gasleft();
-        sweeper.feeFor(taker);
+        sweeper.feeFor(maker);
         assertLt(g - gasleft(), 80_000);
     }
 
     function test_Fee_DisabledChogCollectionMeansNoExemption() public {
         MockNFT chog = new MockNFT("Chog");
-        chog.mint(taker, 1);
+        chog.mint(maker, 1);
         _setFee(1 ether);
-        assertEq(sweeper.feeFor(taker), 1 ether); // collection unset
+        assertEq(sweeper.feeFor(maker), 1 ether); // collection unset
     }
 
     function testFuzz_Fee_Accounting(uint128 fee, uint128 wantedMon, uint128 offeredMon) public {
@@ -1172,22 +1284,45 @@ contract ChogSweeperTest is Test {
         wantedMon = uint128(bound(wantedMon, 0, 1e24));
         offeredMon = uint128(bound(offeredMon, 0, 1e24));
         _setFee(fee);
-        vm.deal(maker, uint256(offeredMon) + 1 ether);
-        vm.deal(taker, uint256(wantedMon) + fee + 1 ether);
+        vm.deal(maker, uint256(offeredMon) + fee + 1 ether);
+        vm.deal(taker, uint256(wantedMon) + 1 ether);
         nftA.mint(maker, 1);
 
         uint256 makerBefore = maker.balance;
         uint256 takerBefore = taker.balance;
         vm.prank(maker);
-        uint256 id = sweeper.createSwap{value: offeredMon}(taker, _assets(nftA, 1, 1), _none(), wantedMon, expiry);
+        uint256 id = sweeper.createSwap{value: uint256(offeredMon) + fee}(taker, _assets(nftA, 1, 1), _none(), offeredMon, wantedMon, expiry);
 
         vm.prank(taker);
-        sweeper.acceptSwap{value: uint256(wantedMon) + fee}(id);
+        sweeper.acceptSwap{value: wantedMon}(id);
 
-        assertEq(maker.balance, makerBefore - offeredMon + wantedMon);
-        assertEq(taker.balance, takerBefore - wantedMon - fee + offeredMon);
+        assertEq(maker.balance, makerBefore - offeredMon - fee + wantedMon);
+        assertEq(taker.balance, takerBefore - wantedMon + offeredMon);
         assertEq(sweeper.accruedFees(), fee);
         assertEq(address(sweeper).balance, fee);
+    }
+
+    function testFuzz_Fee_CancelAndDeclineRefundEverything(uint128 fee, uint128 offeredMon, bool decline) public {
+        fee = uint128(bound(fee, 0, sweeper.MAX_PLATFORM_FEE()));
+        offeredMon = uint128(bound(offeredMon, 0, 1e24));
+        _setFee(fee);
+        vm.deal(maker, uint256(offeredMon) + fee + 1 ether);
+        nftA.mint(maker, 1);
+
+        uint256 makerBefore = maker.balance;
+        vm.prank(maker);
+        uint256 id = sweeper.createSwap{value: uint256(offeredMon) + fee}(taker, _assets(nftA, 1, 1), _none(), offeredMon, 0, expiry);
+        if (decline) {
+            vm.prank(taker);
+            sweeper.declineSwap(id);
+        } else {
+            vm.prank(maker);
+            sweeper.cancelSwap(id);
+        }
+        assertEq(maker.balance, makerBefore); // the fee is refunded too
+        assertEq(nftA.ownerOf(1), maker);
+        assertEq(sweeper.accruedFees(), 0);
+        assertEq(address(sweeper).balance, 0);
     }
 
     /*------------------------ fee withdrawal ------------------------*/
@@ -1196,7 +1331,7 @@ contract ChogSweeperTest is Test {
         _setFee(1 ether);
         uint256 id = _createStandardSwap(address(0), 0, 0);
         vm.prank(taker);
-        sweeper.acceptSwap{value: 1 ether}(id);
+        sweeper.acceptSwap(id);
 
         vm.expectEmit(true, false, false, true, address(sweeper));
         emit FeesWithdrawn(treasury, 1 ether);
@@ -1215,6 +1350,17 @@ contract ChogSweeperTest is Test {
         sweeper.withdrawFees();
     }
 
+    function test_WithdrawFees_NothingAccruesUntilAccepted() public {
+        _setFee(1 ether);
+        uint256 id = _createStandardSwap(address(0), 0, 0);
+        vm.expectRevert(ChogSweeper.NoFees.selector); // the fee is still the maker's until the trade settles
+        sweeper.withdrawFees();
+        vm.prank(maker);
+        sweeper.cancelSwap(id);
+        vm.expectRevert(ChogSweeper.NoFees.selector);
+        sweeper.withdrawFees();
+    }
+
     function test_WithdrawFees_RejectingTreasuryCannotBlockTrades() public {
         _setFee(1 ether);
         address rejecter = address(new MonRejecter());
@@ -1223,7 +1369,7 @@ contract ChogSweeperTest is Test {
 
         uint256 id = _createStandardSwap(address(0), 0, 0);
         vm.prank(taker);
-        sweeper.acceptSwap{value: 1 ether}(id); // trading is unaffected
+        sweeper.acceptSwap(id); // trading is unaffected
 
         vm.expectRevert(ChogSweeper.TransferFailed.selector);
         sweeper.withdrawFees();
@@ -1237,19 +1383,59 @@ contract ChogSweeperTest is Test {
 
     function test_WithdrawFees_DoesNotTouchEscrowedMon() public {
         _setFee(1 ether);
-        uint256 openId = _createStandardSwap(address(0), 7 ether, 0);
+        uint256 openId = _createStandardSwap(address(0), 7 ether, 0); // escrows 7 MON + 1 MON fee
+
+        nftA.mint(maker, 2);
+        uint256 id2 = _createFor(maker, address(0), _assets(nftA, 2, 1), _none(), 0, 0);
+        vm.prank(stranger);
+        sweeper.acceptSwap(id2);
+
+        sweeper.withdrawFees(); // only the settled trade's fee
+        assertEq(treasury.balance, 1 ether);
+        assertEq(address(sweeper).balance, 8 ether);
+        uint256 before = maker.balance;
+        vm.prank(maker);
+        sweeper.cancelSwap(openId);
+        assertEq(maker.balance, before + 8 ether); // escrow AND its fee
+        assertEq(address(sweeper).balance, 0);
+    }
+
+    /*---------------------- verified collections ---------------------*/
+
+    function test_Verified_OnlyOwnerCanChangeTheList() public {
+        address[] memory list = new address[](1);
+        list[0] = address(nftA);
+        vm.prank(stranger);
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, stranger));
+        sweeper.setVerifiedCollections(list, false);
+    }
+
+    function test_Verified_CannotAddAnAddressWithoutCode() public {
+        address[] memory list = new address[](1);
+        list[0] = makeAddr("eoa");
+        vm.prank(owner);
+        vm.expectRevert(ChogSweeper.InvalidAsset.selector);
+        sweeper.setVerifiedCollections(list, true);
+    }
+
+    function test_Verified_RemovedCollectionBlocksNewTradesButNeverTrapsOldOnes() public {
+        nftA.mint(maker, 1);
+        uint256 id = _createFor(maker, address(0), _assets(nftA, 1, 1), _none(), 0, 0);
+
+        address[] memory list = new address[](1);
+        list[0] = address(nftA);
+        vm.prank(owner);
+        sweeper.setVerifiedCollections(list, false);
+        assertFalse(sweeper.isVerified(address(nftA)));
 
         nftA.mint(maker, 2);
         vm.prank(maker);
-        uint256 id2 = sweeper.createSwap(address(0), _assets(nftA, 2, 1), _none(), 0, expiry);
-        vm.prank(stranger);
-        sweeper.acceptSwap{value: 1 ether}(id2);
+        vm.expectRevert(abi.encodeWithSelector(ChogSweeper.UnverifiedCollection.selector, address(nftA)));
+        sweeper.createSwap(address(0), _assets(nftA, 2, 1), _none(), 0, 0, expiry);
 
-        sweeper.withdrawFees();
-        assertEq(address(sweeper).balance, 7 ether);
         vm.prank(maker);
-        sweeper.cancelSwap(openId);
-        assertEq(address(sweeper).balance, 0);
+        sweeper.cancelSwap(id); // the existing trade can still be unwound
+        assertEq(nftA.ownerOf(1), maker);
     }
 
     /*------------------------- fee admin ---------------------------*/
@@ -1263,6 +1449,8 @@ contract ChogSweeperTest is Test {
         sweeper.setFeeWaivedUntil(1);
         vm.expectRevert(err);
         sweeper.setChogCollection(address(1));
+        vm.expectRevert(err);
+        sweeper.setPartnerCollection(address(1));
         vm.expectRevert(err);
         sweeper.setTreasury(address(1));
         vm.stopPrank();
@@ -1297,7 +1485,7 @@ contract ChogSweeperTest is Test {
     function test_Admin_CannotAlterExistingTradeTerms() public {
         uint256 id = _createStandardSwap(taker, 2 ether, 1 ether);
         _setFee(5 ether);
-        (address m, address t,, uint64 exp, uint256 offeredMon, uint256 wantedMon,,) = sweeper.getTrade(id);
+        (address m, address t,, uint64 exp, uint256 offeredMon, uint256 wantedMon,,,) = sweeper.getTrade(id);
         assertEq(m, maker);
         assertEq(t, taker);
         assertEq(exp, expiry);
@@ -1319,7 +1507,7 @@ contract ChogSweeperTest is Test {
         assertEq(nftA.ownerOf(1), maker);
         assertEq(maker.balance, makerBefore);
         assertEq(address(sweeper).balance, 0);
-        (,, ChogSweeper.Status status,,,, ChogSweeper.Asset[] memory off,) = sweeper.getTrade(id);
+        (,, ChogSweeper.Status status,,,,, ChogSweeper.Asset[] memory off,) = sweeper.getTrade(id);
         assertEq(uint8(status), uint8(ChogSweeper.Status.Declined));
         assertEq(off.length, 0);
     }
@@ -1379,7 +1567,7 @@ contract ChogSweeperTest is Test {
 
         nftA.mint(maker, 2);
         vm.startPrank(maker);
-        uint256 id2 = sweeper.createSwap(taker, _assets(nftA, 2, 1), _none(), 0, expiry);
+        uint256 id2 = sweeper.createSwap(taker, _assets(nftA, 2, 1), _none(), 0, 0, expiry);
         sweeper.cancelSwap(id2);
         vm.stopPrank();
         vm.prank(taker);
@@ -1391,30 +1579,32 @@ contract ChogSweeperTest is Test {
 
     function test_Gift_MonOnlyToOpenCounter_NothingWantedAtAll() public {
         vm.prank(maker);
-        uint256 id = sweeper.createSwap{value: 3 ether}(address(0), _none(), _none(), 0, expiry);
+        uint256 id = sweeper.createSwap{value: 3 ether}(address(0), _none(), _none(), 3 ether, 0, expiry);
         vm.prank(stranger);
         sweeper.acceptSwap(id);
         assertEq(stranger.balance, 1_003 ether);
         assertEq(address(sweeper).balance, 0);
     }
 
-    function test_Gift_WithFee_TakerPaysOnlyTheFee() public {
+    function test_Gift_WithFee_MakerPaysTheFee_TakerPaysNothing() public {
         _setFee(0.25 ether);
         nftA.mint(maker, 1);
-        vm.prank(maker);
-        uint256 id = sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 0, expiry);
+        uint256 makerBefore = maker.balance;
+        uint256 id = _createFor(maker, address(0), _assets(nftA, 1, 1), _none(), 0, 0);
+        assertEq(makerBefore - maker.balance, 0.25 ether);
 
         uint256 before = stranger.balance;
         vm.prank(stranger);
-        sweeper.acceptSwap{value: 0.25 ether}(id);
-        assertEq(before - stranger.balance, 0.25 ether);
+        sweeper.acceptSwap(id);
+        assertEq(before, stranger.balance);
         assertEq(nftA.ownerOf(1), stranger);
+        assertEq(sweeper.accruedFees(), 0.25 ether);
     }
 
     function test_Gift_CancelWorks() public {
         nftA.mint(maker, 1);
         vm.startPrank(maker);
-        uint256 id = sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 0, expiry);
+        uint256 id = sweeper.createSwap(address(0), _assets(nftA, 1, 1), _none(), 0, 0, expiry);
         sweeper.cancelSwap(id);
         vm.stopPrank();
         assertEq(nftA.ownerOf(1), maker);
@@ -1422,7 +1612,7 @@ contract ChogSweeperTest is Test {
 
     function test_Request_NftsOnly_ZeroMon() public {
         uint256 id = _createStandardSwap(taker, 1 ether, 0);
-        (,,,,, uint256 wantedMon,,) = sweeper.getTrade(id);
+        (,,,,, uint256 wantedMon,,,) = sweeper.getTrade(id);
         assertEq(wantedMon, 0);
     }
 
@@ -1434,12 +1624,12 @@ contract ChogSweeperTest is Test {
         _mintRange(nftA, maker, 100, max);
         _mintRange(nftB, taker, 200, max);
 
-        vm.prank(maker);
-        uint256 id = sweeper.createSwap{value: 2 ether}(taker, _assets(nftA, 100, max), _assets(nftB, 200, max), 1 ether, expiry);
+        uint256 id = _createFor(maker, taker, _assets(nftA, 100, max), _assets(nftB, 200, max), 2 ether, 1 ether);
+        assertEq(address(sweeper).balance, 2.1 ether); // escrowed MON + the maker's fee
 
         uint256 makerBefore = maker.balance;
         vm.prank(taker);
-        sweeper.acceptSwap{value: 1.1 ether}(id);
+        sweeper.acceptSwap{value: 1 ether}(id); // the taker pays exactly what the maker asked for
 
         for (uint256 i; i < max; ++i) {
             assertEq(nftA.ownerOf(100 + i), taker);
@@ -1455,7 +1645,7 @@ contract ChogSweeperTest is Test {
         _mintRange(nftB, stranger, 301, 1);
         nftA.mint(maker, 1);
         vm.prank(maker);
-        uint256 id = sweeper.createSwap{value: 1 ether}(address(0), _assets(nftA, 1, 1), _assets(nftB, 300, 2), 0, expiry);
+        uint256 id = sweeper.createSwap{value: 1 ether}(address(0), _assets(nftA, 1, 1), _assets(nftB, 300, 2), 1 ether, 0, expiry);
 
         uint256 takerBefore = taker.balance;
         vm.prank(taker);
@@ -1486,7 +1676,7 @@ contract ChogSweeperTest is Test {
 
         uint256 id = _createStandardSwap(address(0), 0, 0);
         vm.prank(taker);
-        sweeper.acceptSwap{value: 1 ether}(id);
+        sweeper.acceptSwap(id);
 
         evilTreasury.configure(ReentrantParty.Mode.ReenterWithdraw, 0, true);
         sweeper.withdrawFees();
@@ -1505,7 +1695,7 @@ contract ChogSweeperTest is Test {
         sweeper.setTreasury(address(evilTreasury));
         uint256 id = _createStandardSwap(address(0), 0, 0);
         vm.prank(taker);
-        sweeper.acceptSwap{value: 1 ether}(id);
+        sweeper.acceptSwap(id);
 
         evilTreasury.configure(ReentrantParty.Mode.ReenterWithdraw, 0, false);
         vm.expectRevert(ChogSweeper.TransferFailed.selector);
@@ -1517,7 +1707,7 @@ contract ChogSweeperTest is Test {
     function test_Reentrancy_MakerReentersDeclineOnRefund_Blocked() public {
         ReentrantParty evilMaker = new ReentrantParty(sweeper);
         vm.deal(address(evilMaker), 5 ether);
-        uint256 id = evilMaker.create{value: 5 ether}(taker, _none(), _assets(nftB, 1, 1), 0, expiry);
+        uint256 id = evilMaker.create{value: 5 ether}(taker, _none(), _assets(nftB, 1, 1), 5 ether, 0, expiry);
         evilMaker.configure(ReentrantParty.Mode.ReenterDecline, id, true);
 
         vm.prank(taker);
@@ -1533,7 +1723,7 @@ contract ChogSweeperTest is Test {
         ReentrantParty evilMaker = new ReentrantParty(sweeper);
         _setFee(1 ether);
         vm.deal(address(evilMaker), 5 ether);
-        uint256 id = evilMaker.create{value: 2 ether}(address(0), _none(), _assets(nftB, 1, 1), 0, expiry);
+        uint256 id = evilMaker.create{value: 3 ether}(address(0), _none(), _assets(nftB, 1, 1), 2 ether, 0, expiry); // 2 MON escrow + 1 MON fee
         evilMaker.configure(ReentrantParty.Mode.ReenterAccept, id, true);
         evilMaker.cancel(id);
 
@@ -1545,13 +1735,14 @@ contract ChogSweeperTest is Test {
     /// A hostile NFT re-enters `declineSwap` while the escrow is being returned to the maker.
     function test_Reentrancy_HostileNftDuringDecline_Blocked() public {
         ReentrantNFT evil = new ReentrantNFT();
+        _verify(address(evil));
         evil.mint(maker, 1);
         vm.prank(maker);
         evil.setApprovalForAll(address(sweeper), true);
         ChogSweeper.Asset[] memory off = new ChogSweeper.Asset[](1);
         off[0] = ChogSweeper.Asset(address(evil), 1);
         vm.prank(maker);
-        uint256 id = sweeper.createSwap(taker, off, _none(), 0, expiry);
+        uint256 id = sweeper.createSwap(taker, off, _none(), 0, 0, expiry);
 
         evil.arm(address(sweeper), abi.encodeCall(ChogSweeper.declineSwap, (id)));
         vm.prank(taker);
@@ -1567,17 +1758,17 @@ contract ChogSweeperTest is Test {
         _setFee(1 ether);
         uint256 first = _createStandardSwap(address(0), 0, 0);
         vm.prank(taker);
-        sweeper.acceptSwap{value: 1 ether}(first); // accrues 1 ether
+        sweeper.acceptSwap(first); // accrues 1 ether (paid by the maker at creation)
 
         ReentrantChog evilChog = new ReentrantChog(sweeper);
         vm.prank(owner);
         sweeper.setChogCollection(address(evilChog));
 
         nftA.mint(maker, 2);
-        vm.prank(maker);
-        uint256 second = sweeper.createSwap(address(0), _assets(nftA, 2, 1), _none(), 0, expiry);
+        // The probe runs while the maker creates the trade; the evil collection claims the maker is a holder: fee-free.
+        uint256 second = _createFor(maker, address(0), _assets(nftA, 2, 1), _none(), 0, 0);
         vm.prank(stranger);
-        sweeper.acceptSwap(second); // evil collection claims the taker is a holder: fee-free
+        sweeper.acceptSwap(second);
 
         assertEq(sweeper.accruedFees(), 1 ether, "withdrawal inside the probe must not succeed");
         assertEq(treasury.balance, 0);
@@ -1663,10 +1854,11 @@ contract SolvencyHandler is Test {
         ChogSweeper.Asset[] memory off = new ChogSweeper.Asset[](1);
         off[0] = ChogSweeper.Asset(address(nft), tokenId);
         ChogSweeper.Asset[] memory none = new ChogSweeper.Asset[](0);
+        uint256 fee = sweeper.feeFor(maker);
         vm.prank(maker);
-        try sweeper.createSwap{value: offeredMon}(taker, off, none, wantedMon, uint64(block.timestamp + 1 days)) returns (uint256 id) {
+        try sweeper.createSwap{value: uint256(offeredMon) + fee}(taker, off, none, offeredMon, wantedMon, uint64(block.timestamp + 1 days)) returns (uint256 id) {
             ids.push(id);
-            ghostEscrowMon += offeredMon;
+            ghostEscrowMon += uint256(offeredMon) + fee;
         } catch {}
     }
 
@@ -1674,17 +1866,16 @@ contract SolvencyHandler is Test {
         if (ids.length == 0) return;
         uint256 id = ids[idSeed % ids.length];
         address taker = actors[actorSeed % 3];
-        (, , , , uint256 offeredMon,,,) = sweeper.getTrade(id);
+        (, , , , uint256 offeredMon,, uint256 fee,,) = sweeper.getTrade(id);
         uint256 pay;
         try sweeper.quoteAcceptance(id, taker) returns (uint256 q) {
             pay = q;
         } catch {
             return;
         }
-        uint256 fee = sweeper.feeFor(taker);
         vm.prank(taker);
         try sweeper.acceptSwap{value: pay}(id) {
-            ghostEscrowMon -= offeredMon;
+            ghostEscrowMon -= offeredMon + fee;
             ghostFeesPaid += fee;
         } catch {}
     }
@@ -1692,20 +1883,20 @@ contract SolvencyHandler is Test {
     function cancel(uint256 idSeed) external {
         if (ids.length == 0) return;
         uint256 id = ids[idSeed % ids.length];
-        (address maker,,,, uint256 offeredMon,,,) = sweeper.getTrade(id);
+        (address maker,,,, uint256 offeredMon,, uint256 fee,,) = sweeper.getTrade(id);
         vm.prank(maker);
         try sweeper.cancelSwap(id) {
-            ghostEscrowMon -= offeredMon;
+            ghostEscrowMon -= offeredMon + fee;
         } catch {}
     }
 
     function decline(uint256 idSeed) external {
         if (ids.length == 0) return;
         uint256 id = ids[idSeed % ids.length];
-        (, address taker,,, uint256 offeredMon,,,) = sweeper.getTrade(id);
+        (, address taker,,, uint256 offeredMon,, uint256 fee,,) = sweeper.getTrade(id);
         vm.prank(taker);
         try sweeper.declineSwap(id) {
-            ghostEscrowMon -= offeredMon;
+            ghostEscrowMon -= offeredMon + fee;
         } catch {}
     }
 
@@ -1726,6 +1917,9 @@ contract ChogSweeperInvariantTest is Test {
     function setUp() public {
         sweeper = new ChogSweeper(address(this), treasury, 0.05 ether);
         MockNFT nft = new MockNFT("Inv");
+        address[] memory verified = new address[](1);
+        verified[0] = address(nft);
+        sweeper.setVerifiedCollections(verified, true);
         handler = new SolvencyHandler(sweeper, nft);
         targetContract(address(handler));
     }
@@ -1735,7 +1929,7 @@ contract ChogSweeperInvariantTest is Test {
         assertEq(address(sweeper).balance, handler.ghostEscrowMon() + sweeper.accruedFees());
     }
 
-    /// Every fee a taker paid is either still accrued or has reached the treasury: none is lost or minted.
+    /// Every fee a maker paid on a settled trade is either still accrued or has reached the treasury: none is lost or minted.
     function invariant_FeesConserved() public view {
         assertEq(handler.ghostFeesPaid(), sweeper.accruedFees() + treasury.balance);
     }
@@ -1776,6 +1970,11 @@ contract ChogSweeperGasTest is Test {
         nftA = new MockNFT("A");
         nftB = new MockNFT("B");
         expiry = uint64(block.timestamp + 1 days);
+        address[] memory verified = new address[](2);
+        verified[0] = address(nftA);
+        verified[1] = address(nftB);
+        vm.prank(owner);
+        sweeper.setVerifiedCollections(verified, true);
         vm.deal(maker, 100 ether);
         vm.deal(taker, 100 ether);
         for (uint256 i = 1; i <= 60; ++i) {
@@ -1788,12 +1987,13 @@ contract ChogSweeperGasTest is Test {
         nftB.setApprovalForAll(address(sweeper), true);
 
         vm.startPrank(maker);
-        idOneForOne = sweeper.createSwap(taker, _assets(nftA, 1, 1), _assets(nftB, 1, 1), 0, expiry);
-        idMonOnly = sweeper.createSwap{value: 1 ether}(address(0), _none(), _none(), 1 ether, expiry);
-        idTenForTen = sweeper.createSwap{value: 1 ether}(taker, _assets(nftA, 2, 10), _assets(nftB, 2, 10), 1 ether, expiry);
-        idCancel = sweeper.createSwap{value: 1 ether}(address(0), _assets(nftA, 12, 10), _none(), 0, expiry);
-        idDecline = sweeper.createSwap{value: 1 ether}(taker, _assets(nftA, 22, 10), _none(), 0, expiry);
-        idGift = sweeper.createSwap(address(0), _assets(nftA, 32, 1), _none(), 0, expiry);
+        // every maker call pays the 0.1 MON fee on top of the MON it escrows
+        idOneForOne = sweeper.createSwap{value: 0.1 ether}(taker, _assets(nftA, 1, 1), _assets(nftB, 1, 1), 0, 0, expiry);
+        idMonOnly = sweeper.createSwap{value: 1.1 ether}(address(0), _none(), _none(), 1 ether, 1 ether, expiry);
+        idTenForTen = sweeper.createSwap{value: 1.1 ether}(taker, _assets(nftA, 2, 10), _assets(nftB, 2, 10), 1 ether, 1 ether, expiry);
+        idCancel = sweeper.createSwap{value: 1.1 ether}(address(0), _assets(nftA, 12, 10), _none(), 1 ether, 0, expiry);
+        idDecline = sweeper.createSwap{value: 1.1 ether}(taker, _assets(nftA, 22, 10), _none(), 1 ether, 0, expiry);
+        idGift = sweeper.createSwap{value: 0.1 ether}(address(0), _assets(nftA, 32, 1), _none(), 0, 0, expiry);
         vm.stopPrank();
     }
 
@@ -1815,36 +2015,36 @@ contract ChogSweeperGasTest is Test {
 
     // ------------------------------- settlement -------------------------------
 
-    function test_Gas_Accept_OneForOne_WithFee() public {
-        vm.prank(taker);
-        uint256 g = gasleft();
-        sweeper.acceptSwap{value: 0.1 ether}(idOneForOne);
-        _check("accept 1-for-1 (+fee)", g - gasleft(), 200_000);
-    }
-
-    function test_Gas_Accept_MonForMon_WithFee() public {
-        vm.prank(taker);
-        uint256 g = gasleft();
-        sweeper.acceptSwap{value: 1.1 ether}(idMonOnly);
-        _check("accept MON-for-MON (+fee)", g - gasleft(), 115_000);
-    }
-
-    function test_Gas_Accept_TenForTen_PlusMon_WithFee() public {
-        vm.prank(taker);
-        uint256 g = gasleft();
-        sweeper.acceptSwap{value: 1.1 ether}(idTenForTen);
-        _check("accept 10-for-10 + MON (+fee)", g - gasleft(), 680_000);
-    }
-
-    function test_Gas_Accept_FeeFreeForChogHolder() public {
-        MockNFT chog = new MockNFT("Chog");
-        chog.mint(taker, 1);
-        vm.prank(owner);
-        sweeper.setChogCollection(address(chog));
+    function test_Gas_Accept_OneForOne() public {
         vm.prank(taker);
         uint256 g = gasleft();
         sweeper.acceptSwap(idOneForOne);
-        _check("accept 1-for-1 (Chog holder, no fee)", g - gasleft(), 160_000);
+        _check("accept 1-for-1", g - gasleft(), 200_000);
+    }
+
+    function test_Gas_Accept_MonForMon() public {
+        vm.prank(taker);
+        uint256 g = gasleft();
+        sweeper.acceptSwap{value: 1 ether}(idMonOnly);
+        _check("accept MON-for-MON", g - gasleft(), 115_000);
+    }
+
+    function test_Gas_Accept_TenForTen_PlusMon() public {
+        vm.prank(taker);
+        uint256 g = gasleft();
+        sweeper.acceptSwap{value: 1 ether}(idTenForTen);
+        _check("accept 10-for-10 + MON", g - gasleft(), 680_000);
+    }
+
+    function test_Gas_Create_FeeFreeForChogHolder() public {
+        MockNFT chog = new MockNFT("Chog");
+        chog.mint(maker, 1);
+        vm.prank(owner);
+        sweeper.setChogCollection(address(chog));
+        vm.prank(maker);
+        uint256 g = gasleft();
+        sweeper.createSwap(address(0), _assets(nftA, 33, 1), _none(), 0, 0, expiry);
+        _check("create 1 NFT (Chog holder, no fee)", g - gasleft(), 280_000);
     }
 
     function test_Gas_Cancel_TenNftsPlusMon() public {
@@ -1863,7 +2063,7 @@ contract ChogSweeperGasTest is Test {
 
     function test_Gas_WithdrawFees() public {
         vm.prank(taker);
-        sweeper.acceptSwap{value: 0.1 ether}(idGift);
+        sweeper.acceptSwap(idGift);
         vm.roll(block.number + 1);
         uint256 g = gasleft();
         sweeper.withdrawFees();
@@ -1874,15 +2074,15 @@ contract ChogSweeperGasTest is Test {
 
     /// Each size runs in its own test so every run starts cold. The budget is `BASE + n * PER_TOKEN`:
     /// a quadratic regression in any loop breaks the n=10 case first.
-    uint256 internal constant CREATE_BASE = 160_000;
-    uint256 internal constant CREATE_PER_TOKEN = 115_000;
+    uint256 internal constant CREATE_BASE = 200_000; // + fee probes and the verified-list read
+    uint256 internal constant CREATE_PER_TOKEN = 125_000;
 
     function _createGas(uint256 n) internal {
         ChogSweeper.Asset[] memory off = _assets(nftA, 33, n);
         ChogSweeper.Asset[] memory want = _assets(nftB, 33, n);
         vm.prank(maker);
         uint256 g = gasleft();
-        sweeper.createSwap{value: 1 ether}(address(0), off, want, 1 ether, expiry);
+        sweeper.createSwap{value: 1.1 ether}(address(0), off, want, 1 ether, 1 ether, expiry);
         uint256 used = g - gasleft();
         console2.log("create, NFTs each side:", n, used);
         assertLt(used, CREATE_BASE + n * CREATE_PER_TOKEN, "create gas grew faster than linear");

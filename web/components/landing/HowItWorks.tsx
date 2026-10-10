@@ -2,16 +2,16 @@ import { TriangleAlert } from "lucide-react";
 import { AtomicIcon, BundleIcon, TargetIcon } from "./StepIcons";
 
 const STEPS = [
-  { icon: BundleIcon, title: "Assemble Your Bundle", body: "Pick up to 10 NFTs from your wallet and add an optional MON sweetener." },
-  { icon: TargetIcon, title: "Set Your Terms", body: "Target a specific wallet, or post a public trade and ask for exact tokens from any Monad collection." },
+  { icon: BundleIcon, title: "Assemble Your Bundle", body: "Pick up to 10 verified NFTs from your wallet and add an optional MON sweetener." },
+  { icon: TargetIcon, title: "Set Your Terms", body: "Target a specific wallet, or post a public trade and ask for exact tokens from any verified Monad collection." },
   { icon: AtomicIcon, title: "Atomic Settlement", body: "Once accepted, both sides swap in a single atomic transaction. No tokens left stuck in escrow." },
 ] as const;
 
 const FAQ = [
   { q: "What if nobody accepts my offer?", a: "Nothing happens to your assets. Offers expire at the time you choose, and you can cancel and withdraw at any moment before someone accepts." },
-  { q: "Is there a fee?", a: "A small flat fee in MON is added to the accepting side's payment. It's waived for holders of the Chog collection and during promotions, and the exact amount is shown before anyone confirms." },
+  { q: "Is there a fee?", a: "The person who creates the swap pays a small flat fee in MON. It is refunded in full if the offer is cancelled or declined, and kept only when the trade is accepted. The accepting side never pays a fee. Holders of the Chog collection pay nothing, partner holders get a discount, and the exact amount is shown before you confirm." },
   { q: "What does \u201catomic\u201d mean here?", a: "Every NFT and every MON amount on both sides moves in one transaction. If any part fails, the whole thing reverts and nothing moves." },
-  { q: "Can I trade NFTs that aren't listed?", a: "Yes. Add any ERC-721 by contract address and token ID. Unverified collections are clearly marked, so check the address before you trade." },
+  { q: "Which collections can I trade?", a: "Only collections on the verified list, which the contract itself enforces on both sides of every trade. That keeps look-alike and fake collections out. You can look up any token before you trade it." },
 ] as const;
 
 export function HowItWorks() {

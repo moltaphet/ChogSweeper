@@ -10,30 +10,36 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 /// @notice Peer-to-peer escrow for atomic swaps of ERC-721 bundles and native MON on Monad.
 ///
 /// @dev Lifecycle of a trade:
-///  1. `createSwap`: the maker escrows up to 10 ERC-721 tokens and/or MON and states what they want
-///     (up to 10 ERC-721 tokens and/or MON, possibly nothing at all, which makes the trade a gift),
-///     who may take it (a specific wallet = Direct Swap, or `address(0)` = Open Counter) and an expiry.
-///  2. `acceptSwap`: the taker sends `wantedMon + fee` and settles both sides atomically.
-///     `declineSwap`: a designated taker rejects the trade, returning the escrow to the maker.
-///     `cancelSwap`: the maker reclaims the escrow at any time before fulfilment, even after expiry.
+///  1. `createSwap`: the maker escrows up to 10 ERC-721 tokens and/or MON, pays the platform fee, and states what they
+///     want (up to 10 ERC-721 tokens and/or MON, possibly nothing at all, which makes the trade a gift), who may take it
+///     (a specific wallet = Direct Swap, or `address(0)` = Open Counter) and an expiry.
+///  2. `acceptSwap`: the taker sends exactly `wantedMon` and settles both sides atomically. The maker's fee is kept.
+///     `declineSwap`: a designated taker rejects the trade; the escrow AND the fee return to the maker.
+///     `cancelSwap`: the maker reclaims the escrow and the fee at any time before fulfilment, even after expiry.
 ///
-/// Fee model:
-///  - A flat MON fee is added on top of the taker's payment, because pure NFT trades carry no MON
-///    to deduct it from. The maker always receives exactly `wantedMon`.
-///  - The fee is zero when a promotion window is active (`feeWaivedUntil`) or the taker holds at
-///    least one token of the configured Chog collection.
-///  - `acceptSwap` requires `msg.value` to match exactly. If the owner raises the fee while a
-///    taker's transaction is pending, that transaction reverts instead of overcharging.
-///  - Fees accrue in the contract and are pushed to the treasury by `withdrawFees`, so a reverting
-///    treasury can never block trades.
+/// Verified collections:
+///  - Only ERC-721 collections on the owner-managed verified list can appear in a trade, on either side. This rules out
+///    look-alike or hostile token contracts, whose `transferFrom` could take a taker's payment and deliver nothing.
+///
+/// Fee model (same shape as FoxySwap):
+///  - The initiator (maker) pays a flat MON fee on top of the MON they escrow. It is locked in when the trade is created,
+///    refunded if the trade is cancelled or declined, and kept by the platform only when the trade is accepted.
+///  - The fee is zero while a promotion window is active (`feeWaivedUntil`) or when the maker holds at least one token
+///    of the Chog collection. Holders of the optional partner collection get 25% off per token held, up to 4 (100%).
+///  - `createSwap` requires `msg.value` to equal `offeredMon + fee` exactly. If the owner changes the fee while a
+///    transaction is pending, that transaction reverts instead of charging a different amount.
+///  - The taker pays exactly `wantedMon`, never a fee.
+///  - Fees accrue in the contract and are pushed to the treasury by `withdrawFees`, so a reverting treasury can never
+///    block trades.
 ///
 /// Security notes:
 ///  - Every state-changing external function is `nonReentrant` and follows Checks-Effects-Interactions.
 ///  - ERC-721 tokens move with `transferFrom`, so receiver hooks cannot revert or re-enter to grief settlement.
-///  - Deposits are verified with `ownerOf`, which rejects codeless addresses and tokens that skip the transfer.
-///  - Terms are immutable after creation; the owner can change only fee parameters, never an existing trade.
-///  - The Chog balance check is a gas-capped `staticcall` whose failure means "not a holder", so a faulty or
-///    hostile collection contract cannot block acceptance.
+///  - Deposits are verified with `ownerOf`, which rejects tokens that skip the transfer.
+///  - Terms and the fee are immutable after creation; the owner can change only future fee parameters and the verified
+///    list, never an existing trade.
+///  - Holder checks are gas-capped `staticcall`s whose failure means "not a holder", so a faulty or hostile collection
+///    contract cannot block creation.
 ///  - MON that is force-sent (selfdestruct/coinbase) is not tracked and stays in the contract.
 contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
     /*//////////////////////////////////////////////////////////////
@@ -57,13 +63,14 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
 
     /// @dev Packed storage layout:
     ///  slot 0: maker (160) | expiry (64) | status (8)
-    ///  slot 1: taker (160)
+    ///  slot 1: taker (160) | fee (96)
     ///  slot 2: offeredMon (128) | wantedMon (128)
     struct Trade {
         address maker;
         uint64 expiry;
         Status status;
         address taker;
+        uint96 fee;
         uint128 offeredMon;
         uint128 wantedMon;
         Asset[] offered;
@@ -80,7 +87,10 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
     /// @notice Hard ceiling for the platform fee, a guardrail against a compromised or mistaken owner.
     uint256 public constant MAX_PLATFORM_FEE = 10 ether;
 
-    /// @dev Gas forwarded to the Chog `balanceOf` probe.
+    /// @notice Number of partner-collection tokens that waive the whole fee; each token waives 1/PARTNER_MAX_TIERS of it.
+    uint256 public constant PARTNER_MAX_TIERS = 4;
+
+    /// @dev Gas forwarded to each holder `balanceOf` probe.
     uint256 private constant CHOG_PROBE_GAS = 50_000;
 
     /*//////////////////////////////////////////////////////////////
@@ -90,7 +100,7 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
     /// @notice Number of trades ever created. Trade ids start at 1.
     uint256 public tradeCount;
 
-    /// @notice Flat fee in wei charged to the taker on top of `wantedMon`.
+    /// @notice Flat fee in wei the maker pays, on top of the MON they escrow, when creating a trade.
     uint128 public platformFee;
 
     /// @notice Fees are waived for every taker while `block.timestamp <= feeWaivedUntil`.
@@ -102,8 +112,14 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
     /// @notice Holders of this ERC-721 collection pay no fee. `address(0)` disables the exemption.
     address public chogCollection;
 
+    /// @notice Partner collection: each token held takes 25% off the fee, up to 4 tokens. `address(0)` disables it.
+    address public partnerCollection;
+
     /// @notice Fees collected and not yet withdrawn.
     uint256 public accruedFees;
+
+    /// @notice Collections that may appear in a trade.
+    mapping(address collection => bool) public isVerified;
 
     mapping(uint256 tradeId => Trade) private _trades;
 
@@ -119,7 +135,8 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
         uint256 offeredMon,
         Asset[] wanted,
         uint256 wantedMon,
-        uint64 expiry
+        uint64 expiry,
+        uint256 fee
     );
     event TradeAccepted(uint256 indexed tradeId, address indexed maker, address indexed taker, uint256 fee);
     event TradeCancelled(uint256 indexed tradeId, address indexed maker);
@@ -128,6 +145,8 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
     event PlatformFeeUpdated(uint256 oldFee, uint256 newFee);
     event FeeWaivedUntilUpdated(uint64 until);
     event ChogCollectionUpdated(address indexed collection);
+    event PartnerCollectionUpdated(address indexed collection);
+    event CollectionVerified(address indexed collection, bool verified);
     event TreasuryUpdated(address indexed treasury);
     event FeesWithdrawn(address indexed treasury, uint256 amount);
 
@@ -146,7 +165,7 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
     error NothingOffered();
     error InvalidExpiry();
     error SelfTrade();
-    error AmountTooLarge();
+    error UnverifiedCollection(address collection);
     error InvalidAsset();
     error EscrowDepositFailed();
     error FeeTooHigh();
@@ -173,33 +192,41 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
                               TRADE ACTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Open a trade, escrowing the offered ERC-721 tokens and `msg.value` MON.
-    /// @dev The caller must have approved this contract for every offered token. The wanted side may be
-    ///      empty and `wantedMon` may be zero: with both empty the trade is a pure gift.
+    /// @notice Open a trade, escrowing the offered ERC-721 tokens and `offeredMon` MON, and paying the platform fee.
+    /// @dev The caller must have approved this contract for every offered token and must send exactly
+    ///      `offeredMon + feeFor(caller)` (see `quoteCreation`). Every collection on either side must be verified. The wanted
+    ///      side may be empty and `wantedMon` may be zero: with both empty the trade is a pure gift.
     /// @param taker The only wallet allowed to accept (Direct Swap), or `address(0)` for anyone (Open Counter).
-    /// @param offered ERC-721 tokens the maker deposits (may be empty if `msg.value > 0`).
+    /// @param offered ERC-721 tokens the maker deposits (may be empty if `offeredMon > 0`).
     /// @param wanted ERC-721 tokens the taker must deliver.
-    /// @param wantedMon MON (wei) the taker must pay the maker, excluding the platform fee.
+    /// @param offeredMon MON (wei) the maker escrows for the taker, excluding the fee.
+    /// @param wantedMon MON (wei) the taker must pay the maker.
     /// @param expiry Unix timestamp; the trade can no longer be accepted after it.
     /// @return tradeId Identifier of the new trade.
     function createSwap(
         address taker,
         Asset[] calldata offered,
         Asset[] calldata wanted,
+        uint128 offeredMon,
         uint128 wantedMon,
         uint64 expiry
     ) external payable nonReentrant returns (uint256 tradeId) {
         // ---- Checks ----
         if (offered.length > MAX_ASSETS_PER_SIDE || wanted.length > MAX_ASSETS_PER_SIDE) revert TooManyAssets();
-        if (offered.length == 0 && msg.value == 0) revert NothingOffered();
+        if (offered.length == 0 && offeredMon == 0) revert NothingOffered();
         if (expiry <= block.timestamp) revert InvalidExpiry();
         if (taker == msg.sender) revert SelfTrade();
-        if (msg.value > type(uint128).max) revert AmountTooLarge();
 
-        // An address without code can never deliver a token, so reject it instead of creating a dead trade.
-        for (uint256 i; i < wanted.length; ++i) {
-            if (wanted[i].nft.code.length == 0) revert InvalidAsset();
+        // Only verified collections: a hostile token contract could keep a taker's payment and deliver nothing.
+        for (uint256 i; i < offered.length; ++i) {
+            if (!isVerified[offered[i].nft]) revert UnverifiedCollection(offered[i].nft);
         }
+        for (uint256 i; i < wanted.length; ++i) {
+            if (!isVerified[wanted[i].nft]) revert UnverifiedCollection(wanted[i].nft);
+        }
+
+        uint256 fee = _feeFor(msg.sender);
+        if (msg.value != uint256(offeredMon) + fee) revert WrongValue();
 
         // ---- Effects ----
         unchecked {
@@ -210,7 +237,8 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
         t.expiry = expiry;
         t.status = Status.Active;
         t.taker = taker;
-        t.offeredMon = uint128(msg.value);
+        t.fee = uint96(fee); // fee <= MAX_PLATFORM_FEE < 2**96
+        t.offeredMon = offeredMon;
         t.wantedMon = wantedMon;
         for (uint256 i; i < offered.length; ++i) {
             t.offered.push(offered[i]);
@@ -219,7 +247,7 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
             t.wanted.push(wanted[i]);
         }
 
-        emit TradeCreated(tradeId, msg.sender, taker, offered, msg.value, wanted, wantedMon, expiry);
+        emit TradeCreated(tradeId, msg.sender, taker, offered, offeredMon, wanted, wantedMon, expiry, fee);
 
         // ---- Interactions ----
         for (uint256 i; i < offered.length; ++i) {
@@ -231,8 +259,9 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
     }
 
     /// @notice Accept an active trade and settle both sides atomically.
-    /// @dev `msg.value` must equal `wantedMon + fee` exactly (see `quoteAcceptance`). The caller must have
-    ///      approved this contract for every wanted token. Acceptance is allowed up to and including `expiry`.
+    /// @dev `msg.value` must equal `wantedMon` exactly; the taker pays no fee (the maker paid it at creation and it is kept
+    ///      now). The caller must have approved this contract for every wanted token. Acceptance is allowed up to and
+    ///      including `expiry`.
     /// @param tradeId Identifier returned by `createSwap`.
     function acceptSwap(uint256 tradeId) external payable nonReentrant {
         Trade storage t = _trades[tradeId];
@@ -245,11 +274,11 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
         if (designated != address(0) && designated != msg.sender) revert UnauthorizedTaker();
         if (msg.sender == maker) revert SelfTrade();
         uint256 wantedMon = t.wantedMon;
-        uint256 fee = _feeFor(msg.sender);
-        if (msg.value != wantedMon + fee) revert WrongValue();
+        if (msg.value != wantedMon) revert WrongValue();
 
         // ---- Effects ----
         uint256 offeredMon = t.offeredMon;
+        uint256 fee = t.fee;
         Asset[] memory offered = t.offered;
         Asset[] memory wanted = t.wanted;
         t.status = Status.Accepted;
@@ -272,7 +301,7 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
         if (offeredMon != 0) _sendMon(msg.sender, offeredMon);
     }
 
-    /// @notice Cancel an active trade and return the whole escrow to the maker.
+    /// @notice Cancel an active trade and return the whole escrow, and the fee, to the maker.
     /// @dev Only the maker, at any time before fulfilment (expired trades included).
     /// @param tradeId Identifier returned by `createSwap`.
     function cancelSwap(uint256 tradeId) external nonReentrant {
@@ -290,7 +319,7 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
         _refundMaker(t, msg.sender);
     }
 
-    /// @notice Reject a Direct Swap addressed to you; the escrow returns to the maker.
+    /// @notice Reject a Direct Swap addressed to you; the escrow and the maker's fee return to the maker.
     /// @dev Only the designated taker. Open Counter trades have no designated taker and cannot be declined.
     /// @param tradeId Identifier returned by `createSwap`.
     function declineSwap(uint256 tradeId) external nonReentrant {
@@ -323,7 +352,7 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
         _sendMon(to, amount);
     }
 
-    /// @notice Set the flat taker fee (wei). Applies to trades accepted from now on, including existing ones.
+    /// @notice Set the flat maker fee (wei). Applies to trades created from now on; existing trades keep the fee they paid.
     function setPlatformFee(uint128 newFee) external onlyOwner {
         if (newFee > MAX_PLATFORM_FEE) revert FeeTooHigh();
         emit PlatformFeeUpdated(platformFee, newFee);
@@ -342,6 +371,23 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
         emit ChogCollectionUpdated(collection);
     }
 
+    /// @notice Set the partner collection whose holders get 25% off per token (max 4). `address(0)` disables it.
+    function setPartnerCollection(address collection) external onlyOwner {
+        partnerCollection = collection;
+        emit PartnerCollectionUpdated(collection);
+    }
+
+    /// @notice Add or remove collections from the verified list. Adding requires deployed code at the address.
+    /// @dev Removing a collection does not touch trades that already hold its tokens; they can still settle or be cancelled.
+    function setVerifiedCollections(address[] calldata collections, bool verified) external onlyOwner {
+        for (uint256 i; i < collections.length; ++i) {
+            address c = collections[i];
+            if (verified && c.code.length == 0) revert InvalidAsset();
+            isVerified[c] = verified;
+            emit CollectionVerified(c, verified);
+        }
+    }
+
     /// @notice Change the fee recipient.
     function setTreasury(address newTreasury) external onlyOwner {
         if (newTreasury == address(0)) revert ZeroAddress();
@@ -353,16 +399,21 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
                                  VIEWS
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice The fee `taker` would pay if they accepted now.
-    function feeFor(address taker) external view returns (uint256) {
-        return _feeFor(taker);
+    /// @notice The fee `maker` would pay if they created a trade now.
+    function feeFor(address maker) external view returns (uint256) {
+        return _feeFor(maker);
     }
 
-    /// @notice The exact `msg.value` `taker` must send to accept `tradeId` right now.
-    function quoteAcceptance(uint256 tradeId, address taker) external view returns (uint256) {
+    /// @notice The exact `msg.value` `maker` must send to create a trade that escrows `offeredMon` MON right now.
+    function quoteCreation(address maker, uint256 offeredMon) external view returns (uint256) {
+        return offeredMon + _feeFor(maker);
+    }
+
+    /// @notice The exact `msg.value` the taker must send to accept `tradeId`: the requested MON, no fee.
+    function quoteAcceptance(uint256 tradeId, address) external view returns (uint256) {
         Trade storage t = _trades[tradeId];
         if (t.status == Status.None) revert TradeNotFound();
-        return t.wantedMon + _feeFor(taker);
+        return t.wantedMon;
     }
 
     /// @notice Full details of a trade. Asset arrays are empty once the trade is settled.
@@ -376,12 +427,13 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
             uint64 expiry,
             uint256 offeredMon,
             uint256 wantedMon,
+            uint256 fee,
             Asset[] memory offered,
             Asset[] memory wanted
         )
     {
         Trade storage t = _trades[tradeId];
-        return (t.maker, t.taker, t.status, t.expiry, t.offeredMon, t.wantedMon, t.offered, t.wanted);
+        return (t.maker, t.taker, t.status, t.expiry, t.offeredMon, t.wantedMon, t.fee, t.offered, t.wanted);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -394,9 +446,9 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
         if (s != Status.Active) revert TradeNotActive();
     }
 
-    /// @dev Returns the escrowed assets to `to` and clears the stored bundles. Status must already be final.
+    /// @dev Returns the escrowed assets and the fee to `to` and clears the stored bundles. Status must already be final.
     function _refundMaker(Trade storage t, address to) private {
-        uint256 offeredMon = t.offeredMon;
+        uint256 refundMon = uint256(t.offeredMon) + t.fee;
         Asset[] memory offered = t.offered;
         delete t.offered;
         delete t.wanted;
@@ -404,30 +456,31 @@ contract ChogSweeper is ERC721Holder, ReentrancyGuard, Ownable2Step {
         for (uint256 i; i < offered.length; ++i) {
             IERC721(offered[i].nft).transferFrom(address(this), to, offered[i].tokenId);
         }
-        if (offeredMon != 0) _sendMon(to, offeredMon);
+        if (refundMon != 0) _sendMon(to, refundMon);
     }
 
-    function _feeFor(address taker) private view returns (uint256) {
+    function _feeFor(address maker) private view returns (uint256) {
         uint256 fee = platformFee;
         if (fee == 0 || block.timestamp <= feeWaivedUntil) return 0;
-        return _holdsChog(taker) ? 0 : fee;
+        if (_balanceOf(chogCollection, maker) != 0) return 0;
+        uint256 tiers = _balanceOf(partnerCollection, maker);
+        if (tiers == 0) return fee;
+        if (tiers >= PARTNER_MAX_TIERS) return 0;
+        return fee * (PARTNER_MAX_TIERS - tiers) / PARTNER_MAX_TIERS;
     }
 
-    /// @dev Gas-capped, memory-safe `balanceOf` probe. Any failure (revert, out of gas, short or empty
-    ///      returndata, no code) is treated as "not a holder".
-    function _holdsChog(address account) private view returns (bool holder) {
-        address chog = chogCollection;
-        if (chog == address(0)) return false;
+    /// @dev Gas-capped, memory-safe `balanceOf` probe. Any failure (revert, out of gas, short or empty returndata, no
+    ///      code, `collection == address(0)`) is treated as a balance of zero.
+    function _balanceOf(address collection, address account) private view returns (uint256 held) {
+        if (collection == address(0)) return 0;
         bytes memory callData = abi.encodeCall(IERC721.balanceOf, (account));
-        uint256 held;
         bool ok;
         assembly ("memory-safe") {
             let out := mload(0x40)
-            ok := staticcall(CHOG_PROBE_GAS, chog, add(callData, 0x20), mload(callData), out, 0x20)
-            // Require a full 32-byte word, and code at the target (a call to an EOA succeeds with no returndata).
+            ok := staticcall(CHOG_PROBE_GAS, collection, add(callData, 0x20), mload(callData), out, 0x20)
+            // Require a full 32-byte word (a call to an EOA succeeds with no returndata).
             if and(ok, iszero(lt(returndatasize(), 0x20))) { held := mload(out) }
         }
-        return held != 0;
     }
 
     /// @dev Sends MON with a low-level call forwarding all gas; reverts on failure.

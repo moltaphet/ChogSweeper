@@ -62,6 +62,6 @@ export interface SwapRecord extends Omit<SwapOffer, "offered" | "wanted"> {
   readonly createdBlock?: bigint;
   readonly createdTx?: string;
   readonly settledTx?: string | null;
-  /** Fee the taker paid on top of wantedMon; only known after acceptance. */
+  /** Fee the maker paid at creation, kept by the platform on acceptance; only known after acceptance. */
   readonly feePaid?: bigint | null;
 }

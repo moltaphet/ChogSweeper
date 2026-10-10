@@ -19,7 +19,7 @@ const REASONS = [
   {
     icon: Layers, tint: "from-[#836EF9] to-[#5E43F3]",
     title: "Multi-asset bundles",
-    body: "Put up to 10 NFTs and an amount of MON on each side of one trade, across any ERC-721 collection on Monad.",
+    body: "Put up to 10 NFTs and an amount of MON on each side of one trade, across any verified ERC-721 collection on Monad.",
   },
 ] as const;
 

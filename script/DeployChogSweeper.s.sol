@@ -15,7 +15,10 @@ import {MockChog} from "../src/MockChog.sol";
 ///   TREASURY_ADDRESS     optional  fee recipient, default deployer
 ///   OWNER_ADDRESS        optional  final owner, default deployer. If different, ownership transfer is STARTED
 ///                                  (Ownable2Step) and must be accepted by that address.
-///   CHOG_COLLECTION      optional  an existing Chog contract to use for the fee exemption
+///   CHOG_COLLECTION      optional  an existing Chog contract to use for the fee exemption (also added to the verified list)
+///   PARTNER_COLLECTION   optional  partner collection: 25% off the fee per token held, up to 4 (also verified)
+///   TRADEABLE_COLLECTIONS optional  comma separated extra collections that may be traded. ONLY these (plus Chog and the
+///                                  partner) can appear in a trade; the owner can change the list later
 ///   DEPLOY_MOCK_CHOG     optional  true/false. Default: true when CHOG_COLLECTION is unset, otherwise false
 ///   SEED_MINT_TO         optional  comma separated addresses to mint mock Chogs to
 ///   SEED_MINT_COUNT      optional  how many mock Chogs each SEED_MINT_TO address receives (default 1, max 10)
@@ -47,6 +50,8 @@ contract DeployChogSweeper is Script {
         // A faucet-style mint contract has no business anywhere but a test network.
         if (deployMock && block.chainid != MONAD_TESTNET && block.chainid != ANVIL) revert MockNotAllowedHere(block.chainid);
 
+        address partner = vm.envOr("PARTNER_COLLECTION", address(0));
+        address[] memory extraVerified = vm.envOr("TRADEABLE_COLLECTIONS", ",", new address[](0));
         address[] memory seedTo = vm.envOr("SEED_MINT_TO", ",", new address[](0));
         uint256 seedCount = vm.envOr("SEED_MINT_COUNT", uint256(1));
 
@@ -68,12 +73,28 @@ contract DeployChogSweeper is Script {
         // The deployer owns the contract while it is configured; handover (if any) comes last.
         sweeper = new ChogSweeper(deployer, treasury, uint128(fee));
         if (chog != address(0)) sweeper.setChogCollection(chog);
+        if (partner != address(0)) sweeper.setPartnerCollection(partner);
+
+        // Only verified collections can be traded: Chog, the partner and anything listed in TRADEABLE_COLLECTIONS.
+        address[] memory verified = new address[](extraVerified.length + 2);
+        uint256 n;
+        if (chog != address(0)) verified[n++] = chog;
+        if (partner != address(0)) verified[n++] = partner;
+        for (uint256 i; i < extraVerified.length; ++i) {
+            verified[n++] = extraVerified[i];
+        }
+        assembly ("memory-safe") {
+            mstore(verified, n)
+        }
+        if (n != 0) sweeper.setVerifiedCollections(verified, true);
         if (finalOwner != deployer) sweeper.transferOwnership(finalOwner);
 
         vm.stopBroadcast();
 
         console2.log("ChogSweeper:     ", address(sweeper));
         console2.log("Chog collection: ", chog);
+        console2.log("Partner:         ", partner);
+        console2.log("Verified count:  ", n);
         console2.log("Mock Chog:       ", deployMock);
         if (finalOwner != deployer) console2.log("Ownership pending; must be accepted by:", finalOwner);
     }

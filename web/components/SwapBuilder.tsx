@@ -78,6 +78,27 @@ export function SwapBuilder() {
   const approvalsKnown = giveCollections.length === 0 || approvals.data !== undefined;
   const needsApproval = approvalsKnown && unapproved.length > 0;
 
+  // ---- verified collections (the contract only accepts collections on its own list) ----
+  const tradeCollections = useMemo(
+    () => [...new Set([...giveItems, ...wantItems].map((i) => i.contract.toLowerCase()))] as Address[],
+    [giveItems, wantItems],
+  );
+  const verifiedOnChain = useReadContracts({
+    allowFailure: false,
+    query: { enabled: !!SWEEPER_ADDRESS && tradeCollections.length > 0 },
+    contracts: tradeCollections.map((c) => ({ address: SWEEPER_ADDRESS!, abi: sweeperAbi, functionName: "isVerified" as const, args: [c] as const })),
+  });
+  const notVerified = tradeCollections.filter((_, i) => verifiedOnChain.data?.[i] === false);
+
+  // ---- what creating costs: the MON you give plus the platform fee, which the contract refunds if the swap is cancelled or declined
+  const quote = useQuery({
+    queryKey: ["creation-quote", address, String(giveWei ?? 0n)],
+    enabled: !!address && !!SWEEPER_ADDRESS && !!publicClient && giveWei !== null,
+    refetchInterval: 15_000,
+    queryFn: () => publicClient!.readContract({ address: SWEEPER_ADDRESS!, abi: sweeperAbi, functionName: "quoteCreation", args: [address!, giveWei ?? 0n] }),
+  });
+  const feeWei = quote.data !== undefined && giveWei !== null ? quote.data - giveWei : null;
+
   // ---- validation ------------------------------------------------------
   const isOpenSwap = mode === "open";
   const problem = useMemo((): string | null => {
@@ -85,6 +106,9 @@ export function SwapBuilder() {
     if (giveWei === null) return "Invalid MON amount in “You Give”.";
     if (wantWei === null) return "Invalid MON amount in “You Receive”.";
     if (giveItems.length === 0 && giveWei === 0n) return "Add at least one NFT or some MON to give.";
+    if (notVerified.length > 0) {
+      return `Only verified collections can be traded. ${notVerified.map(shortAddress).join(", ")} ${notVerified.length === 1 ? "is" : "are"} not on the ChogSweeper verified list.`;
+    }
     if (mode === "direct") {
       if (target.state === "empty") return "Enter the collector\u2019s wallet, or switch to a Public Open Trade.";
       if (target.state === "invalid") return "Target must be a valid 0x address or ENS name.";
@@ -92,7 +116,7 @@ export function SwapBuilder() {
       if (targetAddress && sameAddress(targetAddress, address)) return "You cannot swap with yourself.";
     }
     return null;
-  }, [giveWei, wantWei, giveItems.length, mode, target.state, targetAddress, address]);
+  }, [giveWei, wantWei, giveItems.length, mode, target.state, targetAddress, address, notVerified]);
 
   const offer: SwapOffer | null = useMemo(() => {
     if (problem || giveWei === null || wantWei === null) return null;
@@ -108,8 +132,8 @@ export function SwapBuilder() {
 
   // ---- gas estimate (only meaningful once approvals are in place) ------
   const gas = useQuery({
-    queryKey: ["gas", offer?.taker, giveItems.map(nftKey), wantItems.map(nftKey), String(giveWei), String(wantWei)],
-    enabled: !!offer && !!address && approvalsKnown && !needsApproval && chainId === monadTestnet.id,
+    queryKey: ["gas", offer?.taker, giveItems.map(nftKey), wantItems.map(nftKey), String(giveWei), String(wantWei), String(quote.data)],
+    enabled: !!offer && !!address && approvalsKnown && !needsApproval && chainId === monadTestnet.id && quote.data !== undefined,
     retry: false,
     queryFn: async () => {
       const o = offer!;
@@ -122,10 +146,11 @@ export function SwapBuilder() {
             o.taker,
             o.offered.map((a) => ({ nft: a.contract, tokenId: a.tokenId })),
             o.wanted.map((a) => ({ nft: a.contract, tokenId: a.tokenId })),
+            o.offeredMon,
             o.wantedMon,
             BigInt(Math.floor(Date.now() / 1000) + expirySeconds),
           ],
-          value: o.offeredMon,
+          value: quote.data ?? o.offeredMon,
           account: address,
         }),
         publicClient!.getGasPrice(),
@@ -162,6 +187,8 @@ export function SwapBuilder() {
     setError(null);
     setBusy("create");
     try {
+      // Quote again right before sending: the contract refuses any other amount, so a fee change in between cannot overcharge you.
+      const due = await publicClient!.readContract({ address: SWEEPER_ADDRESS!, abi: sweeperAbi, functionName: "quoteCreation", args: [address!, offer.offeredMon] });
       const hash = await writeContractAsync({
         address: SWEEPER_ADDRESS!,
         abi: sweeperAbi,
@@ -170,10 +197,11 @@ export function SwapBuilder() {
           offer.taker,
           offer.offered.map((a) => ({ nft: a.contract, tokenId: a.tokenId })),
           offer.wanted.map((a) => ({ nft: a.contract, tokenId: a.tokenId })),
+          offer.offeredMon,
           offer.wantedMon,
           BigInt(Math.floor(Date.now() / 1000) + expirySeconds),
         ],
-        value: offer.offeredMon,
+        value: due,
         chainId: monadTestnet.id,
       });
       await publicClient!.waitForTransactionReceipt({ hash });
@@ -443,6 +471,11 @@ export function SwapBuilder() {
                   ))}
                 </select>
               </label>
+              <span title="Paid by you when the swap is created, refunded in full if it is cancelled or declined, kept only when it is accepted. Zero for Chog holders and during promotions.">
+                Platform fee:{" "}
+                <strong className="text-monad-ink">{feeWei === null ? "…" : feeWei === 0n ? "Free" : `${formatMon(feeWei, 6)} MON`}</strong>
+                {feeWei !== null && feeWei > 0n && <span className="text-monad-muted"> (refunded if rejected)</span>}
+              </span>
               <span title="Monad charges for the gas limit, so this is the amount reserved at the current gas price.">
                 Est. gas:{" "}
                 <strong className="text-monad-ink">

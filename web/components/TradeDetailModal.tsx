@@ -133,22 +133,16 @@ function ModalBody({ trade, onClose }: { trade: SwapRecord; onClose: () => void 
 
           {actions.canAccept && (
             <dl className="rounded-xl border border-monad-border bg-monad-bg/60 px-4 py-3 text-sm">
-              <div className="flex justify-between"><dt className="text-monad-muted">Requested MON</dt><dd className="font-semibold">{formatMon(trade.wantedMon)} MON</dd></div>
               <div className="flex justify-between">
-                <dt className="text-monad-muted">Platform fee</dt>
-                <dd className="font-semibold">
-                  {actions.fee === null ? "…" : actions.fee === 0n ? <span className="text-status-activeInk">Free</span> : `${formatMon(actions.fee, 6)} MON`}
-                </dd>
-              </div>
-              <div className="mt-1 flex justify-between border-t border-monad-border pt-1">
                 <dt className="font-semibold">You pay</dt>
-                <dd className="font-bold text-monad-deep">{actions.totalDue === null ? "…" : `${formatMon(actions.totalDue, 6)} MON`}</dd>
+                <dd className="font-bold text-monad-deep">{actions.totalDue === null ? "…" : actions.totalDue === 0n ? "Nothing" : `${formatMon(actions.totalDue, 6)} MON`}</dd>
               </div>
+              <p className="mt-1 text-xs text-monad-muted">The platform fee was already paid by the maker. You never pay a fee to accept.</p>
             </dl>
           )}
 
           {trade.feePaid != null && trade.feePaid > 0n && (
-            <p className="text-xs text-monad-muted">Platform fee paid by the taker: {formatMon(trade.feePaid, 6)} MON</p>
+            <p className="text-xs text-monad-muted">Platform fee paid by the maker: {formatMon(trade.feePaid, 6)} MON</p>
           )}
 
           <ul className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-monad-muted">
