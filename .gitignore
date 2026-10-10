@@ -1,0 +1,21 @@
+# Foundry
+out/
+cache/
+broadcast/
+deployments/
+
+# Secrets and local config
+.env
+.env.*
+!.env.example
+
+# Node / Next
+node_modules/
+.next/
+*.tsbuildinfo
+next-env.d.ts
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/

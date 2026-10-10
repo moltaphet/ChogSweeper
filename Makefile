@@ -7,9 +7,9 @@ CHAIN_ID ?= 10143
 
 .PHONY: test dry-run deploy export smoke-testnet e2e-local verify-onchain
 
-test:            ## contracts + indexer + web test suites
+test:            ## contracts + indexer (if present) + web test suites
 	forge test
-	cd indexer && npm test --silent
+	@if [ -d indexer ]; then cd indexer && npm test --silent; else echo "indexer/ not present, skipping its tests"; fi
 	cd web && npx vitest run
 
 dry-run:         ## simulate the deployment against the live RPC; sends nothing
