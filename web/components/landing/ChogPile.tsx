@@ -8,7 +8,18 @@ import { ChogCard } from "./ChogCard";
 const IDS = [
   7, 21, 42, 88, 3, 19, 64, 105, 12, 77, 31, 55, 9, 120, 26, 71, 4, 93, 38, 14, 67, 49, 101, 58, 2, 16, 35, 46, 61, 80, 97, 110, 5, 27, 53, 84,
 ];
-const COINS = 10;
+const COINS = 8;
+/** Chunky letter tiles in between the cards, like the toys in the reference: they make the heap read as a pile of things. */
+const LETTERS = [
+  { c: "C", bg: "linear-gradient(145deg,#A78BFA,#6D4AFF)", fg: "#fff" },
+  { c: "H", bg: "linear-gradient(145deg,#F9A8D4,#EC4899)", fg: "#fff" },
+  { c: "O", bg: "linear-gradient(145deg,#FDE68A,#F59E0B)", fg: "#5B3A00" },
+  { c: "G", bg: "linear-gradient(145deg,#6EE7B7,#10B981)", fg: "#053B2B" },
+  { c: "C", bg: "linear-gradient(145deg,#93C5FD,#3B82F6)", fg: "#fff" },
+  { c: "H", bg: "linear-gradient(145deg,#C4B5FD,#7C3AED)", fg: "#fff" },
+];
+const COIN_AT = IDS.length;
+const LETTER_AT = IDS.length + COINS;
 
 type Piece = { el: HTMLElement; w: number; h: number; body?: import("matter-js").Body };
 
@@ -47,11 +58,11 @@ export function ChogPile() {
       const build = (instant: boolean) => {
         const W = host.clientWidth;
         const H = host.clientHeight;
-        const cardW = Math.max(70, Math.min(124, W / 13));
-        // enough cards that the shower reads as rain, few enough that the heap stays about half the height
-        const count = Math.max(10, Math.min(IDS.length, Math.round((0.5 * W * H) / (cardW * cardW * 1.2))));
+        // Big, chunky pieces: a heap one or two cards deep along the floor, with the whole height above it left clear for the fall.
+        const cardW = Math.max(92, Math.min(176, W / 9));
+        const count = Math.max(6, Math.min(IDS.length, Math.round((0.34 * W * H) / (cardW * cardW * 1.2))));
 
-        const engine = Engine.create({ gravity: { x: 0, y: 1.25 }, enableSleeping: true });
+        const engine = Engine.create({ gravity: { x: 0, y: 1.1 }, enableSleeping: true });
         const wall = 200;
         const thick = 80;
         World.add(engine.world, [
@@ -63,25 +74,26 @@ export function ChogPile() {
         const els = pieces.current;
         const bodies: Array<{ piece: Piece; body: import("matter-js").Body; delay: number; added: boolean }> = [];
         els.forEach((p, i) => {
-          const isCoin = i >= IDS.length;
-          const w = isCoin ? cardW * 0.42 : cardW;
-          const h = isCoin ? w : cardW * 1.2;
+          const kind = i >= LETTER_AT ? "letter" : i >= COIN_AT ? "coin" : "card";
+          const w = kind === "card" ? cardW : kind === "coin" ? cardW * 0.4 : cardW * 0.46;
+          const h = kind === "card" ? cardW * 1.2 : w;
           p.w = w;
           p.h = h;
           p.el.style.width = `${w}px`;
           p.el.style.height = `${h}px`;
-          const body = isCoin
-            ? Bodies.circle(0, 0, w / 2, { restitution: 0.6, friction: 0.2, density: 0.0012 })
-            : Bodies.rectangle(0, 0, w, h, { chamfer: { radius: 14 }, restitution: 0.5, friction: 0.28, frictionAir: 0.006, density: 0.001 });
+          const body =
+            kind === "coin"
+              ? Bodies.circle(0, 0, w / 2, { restitution: 0.6, friction: 0.2, density: 0.0012 })
+              : Bodies.rectangle(0, 0, w, h, { chamfer: { radius: kind === "letter" ? 10 : 14 }, restitution: 0.5, friction: 0.28, frictionAir: 0.006, density: 0.001 });
           p.body = body;
-          // Like rain: each piece starts at its own spot across the whole width, just above the top edge, and falls fast...
-          Body.setPosition(body, { x: w * 0.6 + Math.random() * (W - w * 1.2), y: -h * (0.7 + Math.random() * 1.2) });
-          Body.setAngle(body, (Math.random() - 0.5) * 2);
+          // Rain: each piece starts at its own spot across the whole width, well above the top edge so the fall is long, and ...
+          Body.setPosition(body, { x: w * 0.6 + Math.random() * (W - w * 1.2), y: -h * (0.8 + Math.random() * 3.2) });
+          Body.setAngle(body, (Math.random() - 0.5) * 2.4);
           Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.3);
-          // ...with a sideways kick, so on landing every piece skids off in its own direction.
-          Body.setVelocity(body, { x: (Math.random() - 0.5) * 16, y: 9 + Math.random() * 8 });
-          const live = isCoin ? i - IDS.length < COINS : i < count;
-          if (live) bodies.push({ piece: p, body, delay: instant ? 0 : Math.random() * 1700, added: false });
+          // ... with a sideways kick, so on landing every piece skids off in its own direction.
+          Body.setVelocity(body, { x: (Math.random() - 0.5) * 14, y: 5 + Math.random() * 6 });
+          const live = kind === "card" ? i < count : kind === "coin" ? i - COIN_AT < COINS : i - LETTER_AT < Math.max(2, Math.round(count / 3));
+          if (live) bodies.push({ piece: p, body, delay: instant ? 0 : Math.random() * 2200, added: false });
           p.el.style.opacity = "0";
         });
 
@@ -208,15 +220,20 @@ export function ChogPile() {
       >
         <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Drop again
       </button>
-      <div ref={box} className="relative h-[clamp(380px,62vh,640px)] w-full touch-pan-y select-none overflow-hidden bg-gradient-to-b from-transparent via-monad-tint/40 to-monad-tint/90">
+      <div ref={box} className="relative h-[clamp(460px,80vh,780px)] w-full touch-pan-y select-none overflow-hidden bg-gradient-to-b from-transparent via-monad-tint/40 to-monad-tint/90">
         {IDS.map((id, i) => (
           <div key={id} ref={(el) => { if (el) pieces.current[i] = Object.assign(pieces.current[i] ?? { w: 0, h: 0 }, { el }); }} className="absolute left-0 top-0 will-change-transform" style={{ opacity: 0 }}>
             <ChogCard id={id} compact className="h-full w-full !shadow-[0_18px_30px_-14px_rgba(60,30,200,0.55)]" />
           </div>
         ))}
         {Array.from({ length: COINS }, (_, i) => (
-          <div key={`coin${i}`} ref={(el) => { if (el) pieces.current[IDS.length + i] = Object.assign(pieces.current[IDS.length + i] ?? { w: 0, h: 0 }, { el }); }} className="absolute left-0 top-0 will-change-transform" style={{ opacity: 0 }}>
+          <div key={`coin${i}`} ref={(el) => { if (el) pieces.current[COIN_AT + i] = Object.assign(pieces.current[COIN_AT + i] ?? { w: 0, h: 0 }, { el }); }} className="absolute left-0 top-0 will-change-transform" style={{ opacity: 0 }}>
             <div className="flex h-full w-full items-center justify-center rounded-full border-2 border-white/80 bg-gradient-to-br from-[#FFE08A] via-[#F5B544] to-[#D98E1C] font-display text-[10px] font-black text-[#7A4B00] shadow-[0_10px_22px_-8px_rgba(245,181,68,0.85)]">MON</div>
+          </div>
+        ))}
+        {LETTERS.map((l, i) => (
+          <div key={`letter${i}`} ref={(el) => { if (el) pieces.current[LETTER_AT + i] = Object.assign(pieces.current[LETTER_AT + i] ?? { w: 0, h: 0 }, { el }); }} className="absolute left-0 top-0 will-change-transform" style={{ opacity: 0 }}>
+            <div className="flex h-full w-full items-center justify-center rounded-[14px] border-2 border-white/80 font-display text-3xl font-black shadow-[0_14px_26px_-12px_rgba(60,30,200,0.6)] sm:text-4xl" style={{ background: l.bg, color: l.fg }}>{l.c}</div>
           </div>
         ))}
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-monad-border" aria-hidden />
