@@ -1,0 +1,56 @@
+# Local full stack that mirrors production:
+#   Postgres  ~ Supabase        serverless-redis-http ~ Upstash REST        indexer ~ Cloud Run / Fly worker
+# Usage:  cp indexer/.env.example .env  (set SWEEPER_ADDRESS etc.)  &&  docker compose up --build
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: chogsweeper
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d chogsweeper"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+
+  # Speaks the Upstash REST protocol so the exact same @upstash/redis client works locally.
+  redis-rest:
+    image: hiett/serverless-redis-http:latest
+    depends_on: [redis]
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: local-dev-token
+      SRH_CONNECTION_STRING: redis://redis:6379
+    ports: ["8079:80"]
+
+  indexer:
+    build:
+      context: .
+      dockerfile: indexer/Dockerfile
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis-rest: { condition: service_started }
+    env_file: [.env]
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/chogsweeper
+      UPSTASH_REDIS_REST_URL: http://redis-rest:80
+      UPSTASH_REDIS_REST_TOKEN: local-dev-token
+    ports: ["8080:8080"]
+    restart: unless-stopped
+
+  web:
+    build: { context: ./web }
+    depends_on: [postgres, redis-rest]
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/chogsweeper
+      UPSTASH_REDIS_REST_URL: http://redis-rest:80
+      UPSTASH_REDIS_REST_TOKEN: local-dev-token
+    ports: ["3000:3000"]
+
+volumes:
+  pgdata:
