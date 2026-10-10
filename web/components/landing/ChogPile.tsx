@@ -30,7 +30,7 @@ type Piece = { el: HTMLElement; w: number; h: number; body?: import("matter-js")
  *
  * The section spans the full width of the page. The drop starts when it scrolls into view (at once if it already is) and
  * plays again each time you come back to it after leaving; "Drop again" replays it on demand. With `prefers-reduced-motion`
- * the pile is simulated ahead of time and shown already settled. The library is loaded on demand so it never weighs on the
+ * the fall is gentler (no spin, little drift) but still plays. The library is loaded on demand so it never weighs on the
  * first paint.
  */
 export function ChogPile() {
@@ -52,10 +52,11 @@ export function ChogPile() {
       const Matter = (await import("matter-js")).default; // already preloaded below, so this resolves at once
       if (disposed) return;
       const { Engine, World, Bodies, Body, Mouse, MouseConstraint, Events } = Matter;
+      // With "reduce motion" on, the cards still fall once (it is the point of the section) but gently: no spin, little sideways drift.
       const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       const finePointer = window.matchMedia("(pointer: fine)").matches;
 
-      const build = (instant: boolean) => {
+      const build = (instant: boolean, calm = false) => {
         const W = host.clientWidth;
         const H = host.clientHeight;
         // Big, chunky pieces: a heap one or two cards deep along the floor, with the whole height above it left clear for the fall.
@@ -88,12 +89,12 @@ export function ChogPile() {
           p.body = body;
           // Rain: each piece starts at its own spot across the whole width, well above the top edge so the fall is long, and ...
           Body.setPosition(body, { x: w * 0.6 + Math.random() * (W - w * 1.2), y: -h * (0.8 + Math.random() * 3.2) });
-          Body.setAngle(body, (Math.random() - 0.5) * 2.4);
-          Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.3);
+          Body.setAngle(body, (Math.random() - 0.5) * (calm ? 0.5 : 2.4));
+          Body.setAngularVelocity(body, calm ? 0 : (Math.random() - 0.5) * 0.3);
           // ... with a sideways kick, so on landing every piece skids off in its own direction.
-          Body.setVelocity(body, { x: (Math.random() - 0.5) * 14, y: 5 + Math.random() * 6 });
+          Body.setVelocity(body, { x: (Math.random() - 0.5) * (calm ? 3 : 14), y: 5 + Math.random() * 6 });
           const live = kind === "card" ? i < count : kind === "coin" ? i - COIN_AT < COINS : i - LETTER_AT < Math.max(2, Math.round(count / 3));
-          if (live) bodies.push({ piece: p, body, delay: instant ? 0 : Math.random() * 2200, added: false });
+          if (live) bodies.push({ piece: p, body, delay: instant ? 0 : Math.random() * (calm ? 1200 : 2200), added: false });
           p.el.style.opacity = "0";
         });
 
@@ -158,7 +159,7 @@ export function ChogPile() {
         };
       };
 
-      let teardown = build(reduced);
+      let teardown = build(false, reduced);
       let width = host.clientWidth;
       let playedAt = performance.now();
       const ro = new ResizeObserver(() => {
@@ -173,7 +174,7 @@ export function ChogPile() {
         teardown();
         playedAt = performance.now();
         width = host.clientWidth;
-        teardown = build(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+        teardown = build(false, window.matchMedia("(prefers-reduced-motion: reduce)").matches);
       };
       stop = () => {
         ro.disconnect();
