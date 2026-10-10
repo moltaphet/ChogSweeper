@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isAddress } from "viem";
 import { getDb } from "@/lib/server/db";
+import { limited } from "@/lib/server/http";
 import { listSwaps, type SwapListType } from "@/lib/server/swaps";
 
 export const runtime = "nodejs";
@@ -20,6 +21,9 @@ export async function GET(req: NextRequest) {
   if (!type || !TYPES.includes(type)) return bad("type must be incoming, outgoing, history or public");
   if (type !== "public" && !isAddress(user, { strict: false })) return bad("user must be a valid 0x address");
   if (cursor !== null && !/^\d{1,78}$/.test(cursor)) return bad("cursor must be a swap id");
+
+  const blocked = await limited(req, "swaps", 120);
+  if (blocked) return blocked;
 
   try {
     const page = await listSwaps(getDb(), { user, type, limit, cursor });

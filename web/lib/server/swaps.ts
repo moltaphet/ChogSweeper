@@ -43,10 +43,10 @@ export interface SwapPage {
 }
 
 /**
- * - history:  swaps involving `user` that are completed, cancelled or declined
+ * - public:   open swaps with no designated taker (Open Counter) that can still be accepted
  * - incoming: open swaps addressed to `user` that can still be accepted (not expired)
  * - outgoing: open swaps created by `user`, including expired ones, which the maker must still cancel to reclaim assets
- * - history:  swaps involving `user` that are completed or cancelled
+ * - history:  swaps involving `user` that are completed, cancelled or declined
  * Open swaps with no designated taker are not "incoming" for anyone; they belong to a public feed.
  */
 const FILTERS: Record<SwapListType, string> = {
