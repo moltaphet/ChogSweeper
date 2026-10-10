@@ -1,6 +1,5 @@
 "use client";
 
-import { RotateCcw } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { ChogCard } from "./ChogCard";
 
@@ -28,15 +27,14 @@ type Piece = { el: HTMLElement; w: number; h: number; body?: import("matter-js")
  * settle into a jumbled heap on the floor, then can be grabbed and thrown with the mouse. The cards are ordinary DOM
  * elements moved with transforms each frame, so the art stays vector-sharp at any resolution.
  *
- * The section spans the full width of the page. The drop starts when it scrolls into view (at once if it already is) and
- * plays again each time you come back to it after leaving; "Drop again" replays it on demand. With `prefers-reduced-motion`
+ * The section spans the full width of the page. The drop plays once per page load, the first time it scrolls into view (at
+ * once if it already is); only a refresh plays it again. With `prefers-reduced-motion`
  * the fall is gentler (no spin, little drift) but still plays. The library is loaded on demand so it never weighs on the
  * first paint.
  */
 export function ChogPile() {
   const box = useRef<HTMLDivElement>(null);
   const pieces = useRef<Piece[]>([]);
-  const replay = useRef<() => void>(() => {});
 
   useEffect(() => {
     const host = box.current;
@@ -44,7 +42,6 @@ export function ChogPile() {
     let disposed = false;
     let stop = () => {};
     let started = false;
-    let armed = false; // true once the pile has been fully out of view: the next entry replays the drop
 
     const run = async () => {
       if (started) return;
@@ -162,7 +159,7 @@ export function ChogPile() {
 
       let teardown = build(false, reduced);
       let width = host.clientWidth;
-      let playedAt = performance.now();
+      const playedAt = performance.now();
       const ro = new ResizeObserver(() => {
         if (Math.abs(host.clientWidth - width) < 40) return;
         width = host.clientWidth;
@@ -171,12 +168,6 @@ export function ChogPile() {
         teardown = build(true); // after a resize, show the settled pile straight away
       });
       ro.observe(host);
-      replay.current = () => {
-        teardown();
-        playedAt = performance.now();
-        width = host.clientWidth;
-        teardown = build(false, window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-      };
       stop = () => {
         ro.disconnect();
         teardown();
@@ -185,21 +176,15 @@ export function ChogPile() {
 
     void import("matter-js"); // fetch the physics library now, so the drop starts the instant the pile is in view
 
-    // Start when the pile is on screen (immediately if it already is), and again after each visit away from it.
+    // The rain falls once per page load, the first time the pile is on screen (at once if it already is). Only a refresh plays it again.
     const io = new IntersectionObserver(
       (entries) => {
-        for (const e of entries) {
-          if (e.intersectionRatio === 0) armed = started;
-          else if (e.intersectionRatio >= 0.35) {
-            if (!started) void run();
-            else if (armed) {
-              armed = false;
-              replay.current();
-            }
-          }
+        if (entries.some((e) => e.intersectionRatio >= 0.35)) {
+          io.disconnect();
+          void run();
         }
       },
-      { threshold: [0, 0.35] },
+      { threshold: 0.35 },
     );
     io.observe(host);
 
@@ -215,13 +200,6 @@ export function ChogPile() {
       <div className="pointer-events-none absolute inset-x-0 top-4 z-10 flex justify-center" aria-hidden>
         <span className="rounded-full bg-monad-ink px-3.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white shadow-card">Grab and throw the Chogs</span>
       </div>
-      <button
-        type="button"
-        onClick={() => replay.current()}
-        className="absolute right-4 top-4 z-10 inline-flex items-center gap-1.5 rounded-full border border-monad-border bg-white/90 px-3 py-1.5 text-xs font-semibold text-monad-deep shadow-card backdrop-blur transition hover:border-monad-primary sm:right-8"
-      >
-        <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Drop again
-      </button>
       <div ref={box} className="relative h-[clamp(460px,80vh,780px)] w-full touch-pan-y select-none overflow-hidden bg-gradient-to-b from-transparent via-monad-tint/40 to-monad-tint/90">
         {IDS.map((id, i) => (
           <div key={id} ref={(el) => { if (el) pieces.current[i] = Object.assign(pieces.current[i] ?? { w: 0, h: 0 }, { el }); }} className="absolute left-0 top-0 will-change-transform" style={{ opacity: 0 }}>
