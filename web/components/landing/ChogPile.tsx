@@ -1,11 +1,12 @@
 "use client";
 
+import { RotateCcw } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { ChogCard } from "./ChogCard";
 
 /** Ids of the Chogs that rain down. The same id always draws the same Chog. */
 const IDS = [7, 21, 42, 88, 3, 19, 64, 105, 12, 77, 31, 55, 9, 120, 26, 71, 4, 93, 38, 14, 67, 49, 101, 58];
-const COINS = 5;
+const COINS = 6;
 
 type Piece = { el: HTMLElement; w: number; h: number; body?: import("matter-js").Body };
 
@@ -14,12 +15,15 @@ type Piece = { el: HTMLElement; w: number; h: number; body?: import("matter-js")
  * settle into a jumbled heap on the floor, then can be grabbed and thrown with the mouse. The cards are ordinary DOM
  * elements moved with transforms each frame, so the art stays vector-sharp at any resolution.
  *
- * The drop starts when the section scrolls into view (at once if it already is). With `prefers-reduced-motion` the pile is
- * simulated ahead of time and shown already settled. The library is loaded on demand so it never weighs on the first paint.
+ * The section spans the full width of the page. The drop starts when it scrolls into view (at once if it already is) and
+ * plays again each time you come back to it after leaving; "Drop again" replays it on demand. With `prefers-reduced-motion`
+ * the pile is simulated ahead of time and shown already settled. The library is loaded on demand so it never weighs on the
+ * first paint.
  */
 export function ChogPile() {
   const box = useRef<HTMLDivElement>(null);
   const pieces = useRef<Piece[]>([]);
+  const replay = useRef<() => void>(() => {});
 
   useEffect(() => {
     const host = box.current;
@@ -27,11 +31,12 @@ export function ChogPile() {
     let disposed = false;
     let stop = () => {};
     let started = false;
+    let armed = false; // true once the pile has been fully out of view: the next entry replays the drop
 
     const run = async () => {
       if (started) return;
       started = true;
-      const Matter = (await import("matter-js")).default;
+      const Matter = (await import("matter-js")).default; // already preloaded below, so this resolves at once
       if (disposed) return;
       const { Engine, World, Bodies, Body, Mouse, MouseConstraint, Events } = Matter;
       const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -40,8 +45,8 @@ export function ChogPile() {
       const build = (instant: boolean) => {
         const W = host.clientWidth;
         const H = host.clientHeight;
-        const cardW = Math.max(84, Math.min(140, W / 9.5));
-        const count = W < 640 ? 9 : W < 1100 ? 12 : 15;
+        const cardW = Math.max(84, Math.min(150, W / 11));
+        const count = Math.max(9, Math.min(24, Math.round(W / 95)));
 
         const engine = Engine.create({ gravity: { x: 0, y: 1.25 }, enableSleeping: true });
         const wall = 200;
@@ -66,12 +71,12 @@ export function ChogPile() {
             ? Bodies.circle(0, 0, w / 2, { restitution: 0.5, friction: 0.4, density: 0.0012 })
             : Bodies.rectangle(0, 0, w, h, { chamfer: { radius: 16 }, restitution: 0.32, friction: 0.7, frictionAir: 0.012, density: 0.001 });
           p.body = body;
-          Body.setPosition(body, { x: w + Math.random() * (W - w * 2), y: -h - Math.random() * H * 0.9 });
+          Body.setPosition(body, { x: w * 0.6 + Math.random() * (W - w * 1.2), y: -h * (0.7 + Math.random() * 1.6) }); // just above the top edge: visible at once
           Body.setAngle(body, (Math.random() - 0.5) * 1.4);
           Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.12);
-          Body.setVelocity(body, { x: (Math.random() - 0.5) * 3, y: 2 + Math.random() * 3 });
+          Body.setVelocity(body, { x: (Math.random() - 0.5) * 4, y: 6 + Math.random() * 5 });
           const live = isCoin ? i - IDS.length < COINS : i < count;
-          if (live) bodies.push({ piece: p, body, delay: instant ? 0 : 120 + i * 85 + Math.random() * 120, added: false });
+          if (live) bodies.push({ piece: p, body, delay: instant ? 0 : i * 55 + Math.random() * 90, added: false });
           p.el.style.opacity = "0";
         });
 
@@ -138,28 +143,44 @@ export function ChogPile() {
 
       let teardown = build(reduced);
       let width = host.clientWidth;
+      let playedAt = performance.now();
       const ro = new ResizeObserver(() => {
         if (Math.abs(host.clientWidth - width) < 40) return;
         width = host.clientWidth;
+        if (performance.now() - playedAt < 6000) return; // never cut a drop short
         teardown();
         teardown = build(true); // after a resize, show the settled pile straight away
       });
       ro.observe(host);
+      replay.current = () => {
+        teardown();
+        playedAt = performance.now();
+        width = host.clientWidth;
+        teardown = build(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+      };
       stop = () => {
         ro.disconnect();
         teardown();
       };
     };
 
-    // Start when the pile is on screen (immediately if it already is).
+    void import("matter-js"); // fetch the physics library now, so the drop starts the instant the pile is in view
+
+    // Start when the pile is on screen (immediately if it already is), and again after each visit away from it.
     const io = new IntersectionObserver(
       (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          io.disconnect();
-          void run();
+        for (const e of entries) {
+          if (e.intersectionRatio === 0) armed = started;
+          else if (e.intersectionRatio >= 0.35) {
+            if (!started) void run();
+            else if (armed) {
+              armed = false;
+              replay.current();
+            }
+          }
         }
       },
-      { threshold: 0.2 },
+      { threshold: [0, 0.35] },
     );
     io.observe(host);
 
@@ -171,11 +192,18 @@ export function ChogPile() {
   }, []);
 
   return (
-    <section aria-label="A pile of Chog NFTs you can grab and throw" className="relative mx-auto max-w-[1320px] px-3 pb-20 sm:px-6">
-      <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center" aria-hidden>
+    <section aria-label="A pile of Chog NFTs you can grab and throw" className="relative w-full pb-16">
+      <div className="pointer-events-none absolute inset-x-0 top-4 z-10 flex justify-center" aria-hidden>
         <span className="rounded-full bg-monad-ink px-3.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white shadow-card">Grab and throw the Chogs</span>
       </div>
-      <div ref={box} className="relative h-[430px] w-full touch-pan-y select-none overflow-hidden rounded-[32px] border border-monad-border/70 bg-gradient-to-b from-white/50 to-monad-tint/80 sm:h-[540px] sm:rounded-[44px]">
+      <button
+        type="button"
+        onClick={() => replay.current()}
+        className="absolute right-4 top-4 z-10 inline-flex items-center gap-1.5 rounded-full border border-monad-border bg-white/90 px-3 py-1.5 text-xs font-semibold text-monad-deep shadow-card backdrop-blur transition hover:border-monad-primary sm:right-8"
+      >
+        <RotateCcw className="h-3.5 w-3.5" aria-hidden /> Drop again
+      </button>
+      <div ref={box} className="relative h-[clamp(380px,62vh,640px)] w-full touch-pan-y select-none overflow-hidden bg-gradient-to-b from-transparent via-monad-tint/40 to-monad-tint/90">
         {IDS.map((id, i) => (
           <div key={id} ref={(el) => { if (el) pieces.current[i] = Object.assign(pieces.current[i] ?? { w: 0, h: 0 }, { el }); }} className="absolute left-0 top-0 will-change-transform" style={{ opacity: 0 }}>
             <ChogCard id={id} compact className="h-full w-full !shadow-[0_18px_30px_-14px_rgba(60,30,200,0.55)]" />
