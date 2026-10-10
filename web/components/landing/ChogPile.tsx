@@ -5,8 +5,10 @@ import { useEffect, useRef } from "react";
 import { ChogCard } from "./ChogCard";
 
 /** Ids of the Chogs that rain down. The same id always draws the same Chog. */
-const IDS = [7, 21, 42, 88, 3, 19, 64, 105, 12, 77, 31, 55, 9, 120, 26, 71, 4, 93, 38, 14, 67, 49, 101, 58];
-const COINS = 6;
+const IDS = [
+  7, 21, 42, 88, 3, 19, 64, 105, 12, 77, 31, 55, 9, 120, 26, 71, 4, 93, 38, 14, 67, 49, 101, 58, 2, 16, 35, 46, 61, 80, 97, 110, 5, 27, 53, 84,
+];
+const COINS = 10;
 
 type Piece = { el: HTMLElement; w: number; h: number; body?: import("matter-js").Body };
 
@@ -45,8 +47,9 @@ export function ChogPile() {
       const build = (instant: boolean) => {
         const W = host.clientWidth;
         const H = host.clientHeight;
-        const cardW = Math.max(84, Math.min(150, W / 11));
-        const count = Math.max(9, Math.min(24, Math.round(W / 95)));
+        const cardW = Math.max(70, Math.min(124, W / 13));
+        // enough cards that the shower reads as rain, few enough that the heap stays about half the height
+        const count = Math.max(10, Math.min(IDS.length, Math.round((0.5 * W * H) / (cardW * cardW * 1.2))));
 
         const engine = Engine.create({ gravity: { x: 0, y: 1.25 }, enableSleeping: true });
         const wall = 200;
@@ -68,15 +71,17 @@ export function ChogPile() {
           p.el.style.width = `${w}px`;
           p.el.style.height = `${h}px`;
           const body = isCoin
-            ? Bodies.circle(0, 0, w / 2, { restitution: 0.5, friction: 0.4, density: 0.0012 })
-            : Bodies.rectangle(0, 0, w, h, { chamfer: { radius: 16 }, restitution: 0.32, friction: 0.7, frictionAir: 0.012, density: 0.001 });
+            ? Bodies.circle(0, 0, w / 2, { restitution: 0.6, friction: 0.2, density: 0.0012 })
+            : Bodies.rectangle(0, 0, w, h, { chamfer: { radius: 14 }, restitution: 0.5, friction: 0.28, frictionAir: 0.006, density: 0.001 });
           p.body = body;
-          Body.setPosition(body, { x: w * 0.6 + Math.random() * (W - w * 1.2), y: -h * (0.7 + Math.random() * 1.6) }); // just above the top edge: visible at once
-          Body.setAngle(body, (Math.random() - 0.5) * 1.4);
-          Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.12);
-          Body.setVelocity(body, { x: (Math.random() - 0.5) * 4, y: 6 + Math.random() * 5 });
+          // Like rain: each piece starts at its own spot across the whole width, just above the top edge, and falls fast...
+          Body.setPosition(body, { x: w * 0.6 + Math.random() * (W - w * 1.2), y: -h * (0.7 + Math.random() * 1.2) });
+          Body.setAngle(body, (Math.random() - 0.5) * 2);
+          Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.3);
+          // ...with a sideways kick, so on landing every piece skids off in its own direction.
+          Body.setVelocity(body, { x: (Math.random() - 0.5) * 16, y: 9 + Math.random() * 8 });
           const live = isCoin ? i - IDS.length < COINS : i < count;
-          if (live) bodies.push({ piece: p, body, delay: instant ? 0 : i * 55 + Math.random() * 90, added: false });
+          if (live) bodies.push({ piece: p, body, delay: instant ? 0 : Math.random() * 1700, added: false });
           p.el.style.opacity = "0";
         });
 
