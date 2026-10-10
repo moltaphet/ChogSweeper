@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+*/node_modules/
+web/node_modules/
+indexer/node_modules/
+ops/node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+web/.env.local
+indexer/.env
+
+# Compiler and build artifacts
+cache/
+out/
+.next/
+dist/
+build/
+
+# Local run artifacts & dev logs
+.e2e/
+*.log
+
+# Forge broadcast logs
+!/broadcast
+/broadcast/*/31337/
+/broadcast/**/dry-run/
