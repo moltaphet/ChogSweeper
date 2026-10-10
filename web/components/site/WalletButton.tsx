@@ -43,13 +43,13 @@ export function WalletButton() {
       <div className="flex flex-col items-end">
         <button
           type="button"
-          className="btn-primary !px-4 !py-2.5"
+          className="btn-primary !px-3 !py-2.5 sm:!px-4"
           disabled={isPending || connectors.length === 0 || !hasProvider}
           onClick={() => connectors[0] && connect({ connector: connectors[0], chainId: monadTestnet.id })}
           title={hasProvider ? undefined : "No browser wallet detected. Install one to connect."}
         >
           <Wallet className="h-4 w-4" aria-hidden />
-          {isPending ? "Connecting…" : hasProvider ? "Connect wallet" : "No wallet found"}
+          {isPending ? "Connecting…" : hasProvider ? <span>Connect<span className="hidden sm:inline"> wallet</span></span> : <span><span className="sm:hidden">No wallet</span><span className="hidden sm:inline">No wallet found</span></span>}
         </button>
         {error && <span role="alert" className="absolute top-full mt-1 max-w-[16rem] text-right text-[11px] text-status-dangerInk">{error.message.split("\n")[0]}</span>}
       </div>

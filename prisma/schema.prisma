@@ -55,7 +55,7 @@ model Trade {
   acceptedBy    String?     @map("accepted_by")
   offeredMon    Decimal     @map("offered_mon") @db.Decimal(78, 0)
   wantedMon     Decimal     @map("wanted_mon") @db.Decimal(78, 0)
-  /// Platform fee the taker paid on top of wantedMon; null until accepted.
+  /// Platform fee the maker paid when creating the trade. Kept by the platform on acceptance (null until then); refunded on cancel/decline.
   feePaid       Decimal?    @map("fee_paid") @db.Decimal(78, 0)
   expiry        DateTime    @db.Timestamptz(6)
   createdBlock  BigInt      @map("created_block")

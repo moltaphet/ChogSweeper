@@ -125,7 +125,7 @@ Response: `{ "swaps": [...], "nextCursor": "12" | null }`, newest first.
 - `tokenURI` fetching blocks private IPs by resolving DNS first; a DNS-rebinding race remains, so run the worker in
   a network segment with no access to internal services.
 - Images are referenced by normalised URL, not re-hosted. Put an image CDN/proxy in front if gateways are slow.
-- No rate limiting on the API yet; add `@upstash/ratelimit` before exposing it publicly.
+- The Next.js API rate-limits its outbound-fetching and list endpoints (Redis when configured, per-instance memory otherwise). The limit keys on `x-forwarded-for`, so deploy behind a proxy that sets it (e.g. Vercel).
 - Not exercised against a live Monad RPC or a running Docker daemon yet (see the test summary).
 
 
@@ -156,9 +156,9 @@ then the metadata JSON over `ipfs://` / `ar://` / `data:` / `http(s)`, then the 
 
 | Route | What | Notes |
 | --- | --- | --- |
-| `/` | Landing page: hero, Why ChogSweeper, How it works, Ecosystem & verified collections, full footer | No trading UI. Its call to action is **Launch App** -> `/swap`. |
-| `/swap` | The trading workspace (Swap Hub): New Swap, Requests, History, Public Trades, and the trade detail modal | Slim footer only. |
-| `/swap?tab=requests` | Same workspace, opened on a view | `tab` is `new` (default, omitted), `requests`, `history` or `public`; `mode=open` selects a Public Open Trade. |
+| `/` | Landing page: hero, Why ChogSweeper, How it works, the tools in the Launchpad, Ecosystem & verified collections, full footer | No trading UI. Its call to action is **Open Launchpad** -> `/launchpad`. |
+| `/launchpad` | Every tool in one workspace: Overview, New Swap, Requests, History, Public Trades, Collections, Activity, Token Lookup, and the trade detail modal | Slim footer only. `/swap` redirects here. |
+| `/launchpad?tab=requests` | Same workspace, opened on a view | `tab` is `overview` (default, omitted), `new`, `requests`, `history`, `public`, `collections`, `activity` or `lookup`; `mode=open` selects a Public Open Trade. |
 | `/#how-it-works` | The landing section, reachable from the navbar on any route | `scroll-mt` clears the sticky header. |
 
 * **View state is URL state** (`lib/routes.ts`): links, reloads and shared URLs land on the same view. Tab changes use
@@ -168,7 +168,34 @@ then the metadata JSON over `ipfs://` / `ar://` / `data:` / `http(s)`, then the 
   page, the wallet button inside the app. It uses `useSearchParams`, so it sits in a `Suspense` boundary in `app/layout.tsx`.
 * **Unread requests** (`components/UnreadContext.tsx`) is provided at the root so the badge is right on every route; only the
   Requests view marks offers as read.
-* The trading code (wagmi hooks, builder, image proxy, verified registry) only loads on `/swap`: the landing page ships
+* The trading code (wagmi hooks, builder, image proxy, verified registry) only loads on `/launchpad`: the landing page ships
   ~124 kB of JS against ~244 kB for the app.
 * Fonts are self-hosted from npm (`@fontsource-variable/*`), so builds and dev servers work offline and visitors make no
   request to Google.
+
+
+## Trust model and known limits of the escrow
+
+The contract guarantees that a trade settles atomically on its stated terms and that the owner can never change an
+existing trade. It cannot guarantee that a token behaves like a real NFT.
+
+* **Fake or hostile collections.** A hostile ERC-721 can answer `ownerOf` honestly at deposit and then do nothing on
+  `transferFrom` at settlement, so a taker who pays MON would receive nothing. The contract therefore only allows collections
+  on its verified list. The risk that remains is a collection the owner verifies by mistake, so add collections only after
+  checking their code. The UI still asks a taker to confirm when a trade shows a collection the registry does not know.
+* **Fee exemption for Chog holders** only looks at the maker's balance at the moment of creation. On testnet `MockChog.mint`
+  is open to everyone, so the exemption is trivially obtainable there. On mainnet, anyone who can borrow or cheaply buy a Chog
+  for one transaction can skip the fee. Treat the exemption as a courtesy, not as access control. The optional partner
+  collection gives 25% off per token held (up to four) under the same caveat.
+* **Expired trades hold their escrow** until the maker calls `cancelSwap`. Nothing is returned automatically. The UI says so
+  on expired offers and offers a "Reclaim assets" action. The maker's fee comes back with it.
+* **Open Counter trades can be taken by anyone**, including bots watching the public feed. An open offer with a low or zero
+  ask will be taken by whoever lands first.
+* **The maker pays the fee** (FoxySwap model): flat, paid when creating the swap on top of any MON escrowed, refunded in full
+  if the swap is cancelled or declined, and kept only when it is accepted. The taker pays exactly `wantedMon` and never a fee.
+  Because the fee is locked in per trade, later fee changes never affect existing trades.
+* **Only verified collections can be traded.** The owner-managed list in the contract is enforced on both sides of every
+  trade, so a hostile token contract cannot take a taker's payment and deliver nothing. A collection removed from the list
+  never traps a trade that already holds its tokens: it can still settle or be cancelled. The list is separate from the
+  indexer's registry; keep them aligned (`VERIFIED_COLLECTIONS` at deploy time, `setVerifiedCollections` afterwards).
+* No ERC-1155, no ERC-2981 royalties, no "any token of a collection" offers: wanted tokens are specific (contract, id) pairs.

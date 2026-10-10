@@ -2,7 +2,7 @@ import { parseAbi } from "viem";
 
 export const sweeperEvents = parseAbi([
   "struct Asset { address nft; uint256 tokenId; }",
-  "event TradeCreated(uint256 indexed tradeId, address indexed maker, address indexed taker, Asset[] offered, uint256 offeredMon, Asset[] wanted, uint256 wantedMon, uint64 expiry)",
+  "event TradeCreated(uint256 indexed tradeId, address indexed maker, address indexed taker, Asset[] offered, uint256 offeredMon, Asset[] wanted, uint256 wantedMon, uint64 expiry, uint256 fee)",
   "event TradeAccepted(uint256 indexed tradeId, address indexed maker, address indexed taker, uint256 fee)",
   "event TradeCancelled(uint256 indexed tradeId, address indexed maker)",
   "event TradeDeclined(uint256 indexed tradeId, address indexed maker, address indexed taker)",

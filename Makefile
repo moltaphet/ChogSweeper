@@ -5,12 +5,15 @@ export
 RPC ?= $(if $(MONAD_TESTNET_RPC_URL),$(MONAD_TESTNET_RPC_URL),https://testnet-rpc.monad.xyz/)
 CHAIN_ID ?= 10143
 
-.PHONY: test dry-run deploy export smoke-testnet e2e-local verify-onchain
+.PHONY: test test-js dry-run deploy export smoke-testnet e2e-local verify-onchain
 
 test:            ## contracts + indexer (if present) + web test suites
 	forge test
 	@if [ -d indexer ]; then cd indexer && npm test --silent; else echo "indexer/ not present, skipping its tests"; fi
 	cd web && npx vitest run
+
+test-js:         ## contract behaviour tests on an in-process EVM (no Foundry needed): fees, refunds, verified list, tiers
+	cd ops/contract-tests && npm test --silent
 
 dry-run:         ## simulate the deployment against the live RPC; sends nothing
 	forge script script/DeployChogSweeper.s.sol --rpc-url $(RPC)

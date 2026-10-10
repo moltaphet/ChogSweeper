@@ -130,9 +130,14 @@ async function main() {
   heading(`A approves the escrow and creates the swap: Chog #${chogA}  for  Chog #${chogB} + ${mon(SEND_MON)}`);
   await send(A, "A approves ChogSweeper", { address: CHOG, abi: chogAbi, functionName: "setApprovalForAll", args: [SWEEPER, true] });
   const expiry = BigInt(Math.floor(Date.now() / 1000) + 3600);
+  // The maker (A) pays the platform fee when creating; it is refunded if the swap is cancelled or declined.
+  const feeA = await pub.readContract({ address: SWEEPER, abi: sweeperAbi, functionName: "feeFor", args: [A.address] });
+  const createValue = await pub.readContract({ address: SWEEPER, abi: sweeperAbi, functionName: "quoteCreation", args: [A.address, 0n] });
+  eq(createValue, feeA, "quoteCreation(A, 0) = the platform fee");
   const created = await send(A, "A creates the swap", {
     address: SWEEPER, abi: sweeperAbi, functionName: "createSwap",
-    args: [B.address, [{ nft: CHOG, tokenId: chogA }], [{ nft: CHOG, tokenId: chogB }], SEND_MON, expiry],
+    args: [B.address, [{ nft: CHOG, tokenId: chogA }], [{ nft: CHOG, tokenId: chogB }], 0n, SEND_MON, expiry],
+    value: createValue,
   });
   const tradeId = parseEventLogs({ abi: sweeperAbi, logs: created.logs, eventName: "TradeCreated" })[0].args.tradeId;
   ok(`TradeCreated emitted`, `trade #${tradeId}`);
@@ -159,22 +164,22 @@ async function main() {
   }
 
   heading("B accepts");
-  const feeB = await pub.readContract({ address: SWEEPER, abi: sweeperAbi, functionName: "feeFor", args: [B.address] });
   const configuredFee = await pub.readContract({ address: SWEEPER, abi: sweeperAbi, functionName: "platformFee" });
   const chogCollection = await pub.readContract({ address: SWEEPER, abi: sweeperAbi, functionName: "chogCollection" });
   if (configuredFee > 0n && chogCollection.toLowerCase() === CHOG.toLowerCase()) {
-    eq(feeB, 0n, "B pays no platform fee: it holds a Chog (fee is configured, exemption applies)");
+    eq(feeA, 0n, "A pays no platform fee: it holds a Chog (fee is configured, exemption applies)");
   } else {
-    ok(`platform fee for B: ${mon(feeB)}`);
+    ok(`platform fee A paid at creation: ${mon(feeA)}`);
   }
   const due = await pub.readContract({ address: SWEEPER, abi: sweeperAbi, functionName: "quoteAcceptance", args: [tradeId, B.address] });
-  eq(due, SEND_MON + feeB, "quoteAcceptance = requested MON + fee");
+  eq(due, SEND_MON, "quoteAcceptance = the requested MON only (the taker never pays a fee)");
 
   const balA0 = await pub.getBalance({ address: A.address });
   const balB0 = await pub.getBalance({ address: B.address });
   const sweeperBal0 = await pub.getBalance({ address: SWEEPER });
   const gasBase = { a: { ...gas[A.address] }, b: { ...gas[B.address] } };
   const treasuryBal0 = await pub.getBalance({ address: deployment.config.treasury });
+  const accruedBefore = await pub.readContract({ address: SWEEPER, abi: sweeperAbi, functionName: "accruedFees" });
 
   await send(B, "B approves ChogSweeper", { address: CHOG, abi: chogAbi, functionName: "setApprovalForAll", args: [SWEEPER, true] });
   await send(B, "B accepts the swap", { address: SWEEPER, abi: sweeperAbi, functionName: "acceptSwap", args: [tradeId], value: due });
@@ -200,7 +205,8 @@ async function main() {
     check(bDelta >= due + spentLo && bDelta <= due + spentHi, `B paid ${mon(due)} + gas within [used ${mon(spentLo)}, limit ${mon(spentHi)}]`, `lost ${mon(bDelta)}`);
   }
   const sweeperBal1 = await pub.getBalance({ address: SWEEPER });
-  eq(sweeperBal1 - sweeperBal0, feeB, "escrow holds only the platform fee (no MON stuck)");
+  eq(sweeperBal1 - sweeperBal0, 0n, "settlement leaves the contract balance unchanged: only A's fee stays (no MON stuck)");
+  eq(await pub.readContract({ address: SWEEPER, abi: sweeperAbi, functionName: "accruedFees" }) - accruedBefore, feeA, "A's fee accrued to the platform on acceptance");
   eq((await pub.getBalance({ address: deployment.config.treasury })) - treasuryBal0, 0n, "treasury untouched until fees are withdrawn");
 
   heading("Replay and tamper checks");
@@ -235,10 +241,11 @@ async function seedOpenOffers() {
   const mintOne = async (account) => idOf(await send(account, "mint demo Chog", { address: CHOG, abi: chogAbi, functionName: "mint", args: [account.address] }));
   const idOf = (r) => parseEventLogs({ abi: chogAbi, logs: r.logs, eventName: "Transfer" })[0].args.tokenId;
   const pubChog = await mintOne(A);
-  await send(A, "post public offer", { address: SWEEPER, abi: sweeperAbi, functionName: "createSwap", args: [zeroAddress, [{ nft: CHOG, tokenId: pubChog }], [], parseEther("0.25"), expiry] });
+  const createValue = () => pub.readContract({ address: SWEEPER, abi: sweeperAbi, functionName: "quoteCreation", args: [A.address, 0n] });
+  await send(A, "post public offer", { address: SWEEPER, abi: sweeperAbi, functionName: "createSwap", args: [zeroAddress, [{ nft: CHOG, tokenId: pubChog }], [], 0n, parseEther("0.25"), expiry], value: await createValue() });
   ok(`public offer: Chog #${pubChog} for 0.25 MON (anyone can accept)`);
   const directChog = await mintOne(A);
-  await send(A, "post direct offer", { address: SWEEPER, abi: sweeperAbi, functionName: "createSwap", args: [B.address, [{ nft: CHOG, tokenId: directChog }], [], parseEther("0.1"), expiry] });
+  await send(A, "post direct offer", { address: SWEEPER, abi: sweeperAbi, functionName: "createSwap", args: [B.address, [{ nft: CHOG, tokenId: directChog }], [], 0n, parseEther("0.1"), expiry], value: await createValue() });
   ok(`direct offer to B: Chog #${directChog} for 0.1 MON`);
 }
 

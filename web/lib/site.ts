@@ -1,5 +1,5 @@
 import { monadTestnet, SWEEPER_ADDRESS } from "./config";
-import { HOW_IT_WORKS_HREF, swapHref } from "./routes";
+import { HOW_IT_WORKS_HREF, launchpadHref } from "./routes";
 
 /** Outbound links. Anything not verified is configured via env instead of guessed; an unset link renders as "Soon". */
 export const LINKS = {
@@ -12,7 +12,7 @@ export const LINKS = {
   contract: SWEEPER_ADDRESS ? `${monadTestnet.blockExplorers.default.url}/address/${SWEEPER_ADDRESS}` : null,
 } as const;
 
-export type NavKey = "swap" | "requests" | "how" | "contract";
+export type NavKey = "launchpad" | "how" | "ecosystem" | "contract";
 
 export interface NavItem {
   key: NavKey;
@@ -26,11 +26,11 @@ export interface NavItem {
   title?: string;
 }
 
-/** The navbar, same on every route. "Contract Explorer" points at the deployed contract once there is one, otherwise at the explorer home. */
+/** The navbar, same on every route. Every tool lives in the Launchpad (its badge counts unread requests). "Contract Explorer" points at the deployed contract once there is one, otherwise at the explorer home. */
 export const NAV: readonly NavItem[] = [
-  { key: "swap", label: "Swap", href: swapHref("new") },
-  { key: "requests", label: "Requests", href: swapHref("requests"), badge: true },
+  { key: "launchpad", label: "Launchpad", href: launchpadHref(), badge: true },
   { key: "how", label: "How It Works", href: HOW_IT_WORKS_HREF },
+  { key: "ecosystem", label: "Ecosystem", href: "/#ecosystem" },
   {
     key: "contract",
     label: "Contract Explorer",
@@ -42,9 +42,10 @@ export const NAV: readonly NavItem[] = [
 
 /** Footer shortcuts. */
 export const FOOTER_NAV: ReadonlyArray<{ label: string; href: string }> = [
-  { label: "Swap", href: swapHref("new") },
-  { label: "Public Trades", href: swapHref("public") },
-  { label: "Requests", href: swapHref("requests") },
+  { label: "Launchpad", href: launchpadHref() },
+  { label: "New Swap", href: launchpadHref("new") },
+  { label: "Public Trades", href: launchpadHref("public") },
+  { label: "Requests", href: launchpadHref("requests") },
   { label: "How It Works", href: HOW_IT_WORKS_HREF },
   { label: "Ecosystem", href: "/#ecosystem" },
 ];

@@ -2,9 +2,9 @@
 
 import { Menu, Rocket, X } from "lucide-react";
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { parseTab, SWAP_PATH } from "@/lib/routes";
+import { LAUNCHPAD_PATH } from "@/lib/routes";
 import { NAV, type NavKey } from "@/lib/site";
 import { Wordmark } from "./site/Logo";
 import { NavLinks } from "./site/NavLinks";
@@ -12,31 +12,40 @@ import { NetworkSelector } from "./site/NetworkSelector";
 import { WalletButton } from "./site/WalletButton";
 import { useUnread } from "./UnreadContext";
 
-/** On the landing page: is the "How it works" section the one currently under the header? */
-function useHowInView(enabled: boolean) {
-  const [inView, setInView] = useState(false);
+/** On the landing page: which of these sections is the one currently under the header? */
+function useSectionInView(ids: readonly string[], enabled: boolean): string | null {
+  const [current, setCurrent] = useState<string | null>(null);
   useEffect(() => {
-    if (!enabled) return setInView(false);
-    const el = document.getElementById("how-it-works");
-    if (!el) return;
-    const io = new IntersectionObserver(([e]) => setInView(!!e?.isIntersecting), { rootMargin: "-30% 0px -55% 0px" });
-    io.observe(el);
+    if (!enabled) return setCurrent(null);
+    const seen = new Set<string>();
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) (e.isIntersecting ? seen.add(e.target.id) : seen.delete(e.target.id));
+        setCurrent(ids.find((id) => seen.has(id)) ?? null);
+      },
+      { rootMargin: "-30% 0px -55% 0px" },
+    );
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (el) io.observe(el);
+    }
     return () => io.disconnect();
-  }, [enabled]);
-  return inView;
+  }, [enabled, ids]);
+  return current;
 }
+
+const LANDING_SECTIONS = ["how-it-works", "ecosystem"] as const;
 
 /**
  * One navbar for the whole site.
- *   left   brand (home)                          center  Swap / Requests (unread) / How It Works / Contract Explorer
- *   right  live network pill + route-aware CTA: "Launch App" on the landing page, the wallet button inside the app
+ *   left   brand (home)                          center  Launchpad (unread) / How It Works / Ecosystem / Contract Explorer
+ *   right  live network pill + route-aware CTA: "Open Launchpad" on the landing page, the wallet button inside the app
  */
 export function Navbar() {
   const pathname = usePathname();
-  const params = useSearchParams();
-  const inApp = pathname.startsWith(SWAP_PATH);
+  const inApp = pathname.startsWith(LAUNCHPAD_PATH);
   const { unread } = useUnread();
-  const howInView = useHowInView(!inApp);
+  const section = useSectionInView(LANDING_SECTIONS, !inApp);
   const [menu, setMenu] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -48,7 +57,7 @@ export function Navbar() {
   }, []);
   useEffect(() => setMenu(false), [pathname]);
 
-  const active: NavKey | null = inApp ? (parseTab(params.get("tab")) === "requests" ? "requests" : "swap") : howInView ? "how" : null;
+  const active: NavKey | null = inApp ? "launchpad" : section === "how-it-works" ? "how" : section === "ecosystem" ? "ecosystem" : null;
 
   return (
     <header className={`sticky top-0 z-40 transition duration-300 ${scrolled || menu || inApp ? "border-b border-monad-border/70 bg-white/75 shadow-[0_8px_30px_-18px_rgba(94,67,243,0.35)] backdrop-blur-xl" : "border-b border-transparent bg-transparent"}`}>
@@ -67,8 +76,8 @@ export function Navbar() {
           {inApp ? (
             <WalletButton />
           ) : (
-            <Link href={SWAP_PATH} className="btn-primary !px-4 !py-2.5">
-              <Rocket className="h-4 w-4" aria-hidden /> Launch App
+            <Link href={LAUNCHPAD_PATH} className="btn-primary !px-3 !py-2.5 sm:!px-4">
+              <Rocket className="h-4 w-4" aria-hidden /> <span><span className="hidden sm:inline">Open </span>Launchpad</span>
             </Link>
           )}
           <button type="button" className="btn-ghost relative !p-2.5 xl:hidden" aria-label={menu ? "Close menu" : "Open menu"} aria-expanded={menu} aria-controls="mobile-nav" onClick={() => setMenu((m) => !m)}>

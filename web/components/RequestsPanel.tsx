@@ -17,6 +17,7 @@ export function RequestsPanel() {
   // Resolve from live data so the modal updates (status, countdown) after an action completes.
   const open: SwapRecord | null = openId === null ? null : (all.find((t) => t.id === openId) ?? null);
   const loading = isConnected && isLoading;
+  const expiredCount = (data?.outgoing ?? []).filter((t) => t.status === "expired").length;
 
   return (
     <>
@@ -49,6 +50,13 @@ export function RequestsPanel() {
           />
         </Column>
       </div>
+
+      {expiredCount > 0 && (
+        <p role="status" className="mt-4 rounded-xl bg-status-warnBg px-4 py-3 text-sm text-status-warn">
+          {expiredCount} of your offers expired. Their assets stay in escrow until you reclaim them: open each one under
+          Outgoing Offers and press &ldquo;Reclaim assets&rdquo;.
+        </p>
+      )}
 
       {data?.source === "chain" && (
         <p className="mt-4 text-xs text-monad-muted">

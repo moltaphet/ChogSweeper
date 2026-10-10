@@ -33,7 +33,7 @@ export interface ApiSwap {
   createdAt: string;
   createdTx: string;
   settledTx: string | null;
-  /** Fee the taker paid on top of wantedMon (wei), null until accepted. */
+  /** Fee the maker paid when creating the trade (wei); kept on acceptance, so null until then. */
   feePaid: string | null;
 }
 

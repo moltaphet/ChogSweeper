@@ -45,7 +45,7 @@ body {
 
   /* Section headings share one voice. */
   .eyebrow { @apply font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-monad-primary; }
-  .h-section { @apply font-display text-3xl font-extrabold tracking-tight text-monad-ink sm:text-4xl; }
+  .h-section { @apply text-balance font-display text-3xl font-extrabold tracking-tight text-monad-ink sm:text-4xl; }
 
   /* The trade ticket: a perforated seam with die-cut notches between the two halves of one deal. */
   .ticket-seam {

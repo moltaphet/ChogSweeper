@@ -8,7 +8,8 @@ const compiled = path.resolve(__dirname, "../../out/ChogSweeper.sol/ChogSweeper.
 const generated = path.resolve(__dirname, "../lib/generated/ChogSweeper.abi.json");
 
 describe.skipIf(!existsSync(compiled))("handwritten sweeperAbi matches the compiled contract", () => {
-  const real = JSON.parse(readFileSync(compiled, "utf8")).abi as any[];
+  // skipIf does not stop this body from running, so only read the artifact when it exists.
+  const real = (existsSync(compiled) ? JSON.parse(readFileSync(compiled, "utf8")).abi : []) as any[];
   const sel = (i: any) => (i.type === "event" ? toEventSelector(i) : toFunctionSelector(i));
 
   it("every function and event the frontend uses exists on-chain with the same signature", () => {

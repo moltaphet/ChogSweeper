@@ -16,7 +16,7 @@ const Ctx = createContext<UnreadState>({ unread: 0, setViewingRequests: () => {}
 
 /**
  * Lives at the root so the navbar badge is correct on every route (it is shown on the landing page too), while only the
- * Requests view on `/swap` is allowed to mark things as read.
+ * Requests view on `/launchpad` is allowed to mark things as read.
  */
 export function UnreadProvider({ children }: { children: ReactNode }) {
   const { address } = useAccount();

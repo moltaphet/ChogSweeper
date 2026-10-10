@@ -27,3 +27,9 @@ build/
 !/broadcast
 /broadcast/*/31337/
 /broadcast/**/dry-run/
+# TypeScript incremental build info
+*.tsbuildinfo
+next-env.d.ts
+
+# JS contract tests build output
+ops/contract-tests/artifacts.json

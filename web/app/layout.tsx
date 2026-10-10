@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body>
         <Providers>
           {/* Soft violet atmosphere behind the top of every page. */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[780px] overflow-hidden" aria-hidden>
+          <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[780px] overflow-hidden [mask-image:linear-gradient(to_bottom,#000_55%,transparent)]" aria-hidden>
             <div className="absolute -left-40 -top-40 h-[520px] w-[520px] rounded-full bg-monad-primary/20 blur-3xl" />
             <div className="absolute -right-32 top-10 h-[420px] w-[420px] rounded-full bg-monad-deep/15 blur-3xl" />
           </div>
