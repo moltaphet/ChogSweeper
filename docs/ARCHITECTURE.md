@@ -156,9 +156,9 @@ then the metadata JSON over `ipfs://` / `ar://` / `data:` / `http(s)`, then the 
 
 | Route | What | Notes |
 | --- | --- | --- |
-| `/` | Landing page: hero, Why ChogSweeper, How it works, Ecosystem & verified collections, full footer | No trading UI. Its call to action is **Launch App** -> `/swap`. |
-| `/swap` | The trading workspace (Swap Hub): New Swap, Requests, History, Public Trades, and the trade detail modal | Slim footer only. |
-| `/swap?tab=requests` | Same workspace, opened on a view | `tab` is `new` (default, omitted), `requests`, `history` or `public`; `mode=open` selects a Public Open Trade. |
+| `/` | Landing page: hero, Why ChogSweeper, How it works, the tools in the Launchpad, Ecosystem & verified collections, full footer | No trading UI. Its call to action is **Open Launchpad** -> `/launchpad`. |
+| `/launchpad` | Every tool in one workspace: Overview, New Swap, Requests, History, Public Trades, Collections, Activity, Token Lookup, and the trade detail modal | Slim footer only. `/swap` redirects here. |
+| `/launchpad?tab=requests` | Same workspace, opened on a view | `tab` is `overview` (default, omitted), `new`, `requests`, `history`, `public`, `collections`, `activity` or `lookup`; `mode=open` selects a Public Open Trade. |
 | `/#how-it-works` | The landing section, reachable from the navbar on any route | `scroll-mt` clears the sticky header. |
 
 * **View state is URL state** (`lib/routes.ts`): links, reloads and shared URLs land on the same view. Tab changes use
@@ -168,7 +168,7 @@ then the metadata JSON over `ipfs://` / `ar://` / `data:` / `http(s)`, then the 
   page, the wallet button inside the app. It uses `useSearchParams`, so it sits in a `Suspense` boundary in `app/layout.tsx`.
 * **Unread requests** (`components/UnreadContext.tsx`) is provided at the root so the badge is right on every route; only the
   Requests view marks offers as read.
-* The trading code (wagmi hooks, builder, image proxy, verified registry) only loads on `/swap`: the landing page ships
+* The trading code (wagmi hooks, builder, image proxy, verified registry) only loads on `/launchpad`: the landing page ships
   ~124 kB of JS against ~244 kB for the app.
 * Fonts are self-hosted from npm (`@fontsource-variable/*`), so builds and dev servers work offline and visitors make no
   request to Google.

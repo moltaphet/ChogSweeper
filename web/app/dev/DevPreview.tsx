@@ -56,8 +56,8 @@ export function DevPreview() {
     <main className="mx-auto max-w-6xl space-y-10 px-4 py-10">
       <section className="space-y-4">
         <h2 className="text-lg font-bold">Navigation (3 unread incoming requests)</h2>
-        <div className="rounded-2xl border border-monad-border bg-white/70 p-3"><NavLinks items={NAV} active="requests" unread={3} /></div>
-        <div className="max-w-xs rounded-2xl border border-monad-border bg-white/70 p-3"><NavLinks items={NAV} active="swap" unread={120} variant="stack" /></div>
+        <div className="rounded-2xl border border-monad-border bg-white/70 p-3"><NavLinks items={NAV} active="launchpad" unread={3} /></div>
+        <div className="max-w-xs rounded-2xl border border-monad-border bg-white/70 p-3"><NavLinks items={NAV} active="how" unread={120} variant="stack" /></div>
       </section>
       <section className="space-y-3">
         <h2 className="text-lg font-bold">Badges</h2>

@@ -1,17 +1,9 @@
-import type { Metadata } from "next";
-import { Suspense } from "react";
-import { SwapWorkspace } from "@/components/swap/SwapWorkspace";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Swap Hub",
-  description: "Build, send and accept peer-to-peer NFT swaps on Monad with atomic on-chain settlement.",
-};
-
-/** The trading app. `useSearchParams` (the open view) needs a Suspense boundary so the shell can still be prerendered. */
-export default function SwapPage() {
-  return (
-    <Suspense fallback={<div className="mx-auto max-w-6xl px-4 pt-10"><div className="h-[28rem] animate-pulse rounded-[28px] border border-[#DDD6FE] bg-white/60" aria-busy="true" aria-label="Loading the Swap Hub" /></div>}>
-      <SwapWorkspace />
-    </Suspense>
-  );
+/** The app moved to /launchpad; old links (`/swap?tab=requests`) keep working. `tab=new` was the default view, so it stays "new". */
+export default function SwapRedirect({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(searchParams)) if (typeof v === "string") q.set(k, v);
+  if (!q.has("tab")) q.set("tab", "new");
+  redirect(`/launchpad?${q.toString()}`);
 }

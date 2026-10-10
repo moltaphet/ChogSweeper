@@ -2,7 +2,7 @@
 
 import { ArrowRight, BookOpen } from "lucide-react";
 import Link from "next/link";
-import { SWAP_PATH } from "@/lib/routes";
+import { LAUNCHPAD_PATH } from "@/lib/routes";
 import { LiveDot, useLiveLook } from "../site/LiveDot";
 import { HeroArt } from "./HeroArt";
 
@@ -44,12 +44,12 @@ export function Hero() {
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link href={SWAP_PATH} className="btn-primary !px-7 !py-4 text-base">
-              Launch App <ArrowRight className="h-4 w-4" aria-hidden />
+            <Link href={LAUNCHPAD_PATH} className="btn-primary !px-7 !py-4 text-base">
+              Open Launchpad <ArrowRight className="h-4 w-4" aria-hidden />
             </Link>
             {/* A plain in-page anchor: the browser scrolls smoothly (html has scroll-behavior: smooth) and the URL stays shareable. */}
             <a href="#how-it-works" className="btn-ghost !px-6 !py-4 text-base">
-              <BookOpen className="h-4 w-4" aria-hidden /> Explore Docs
+              <BookOpen className="h-4 w-4" aria-hidden /> How it works
             </a>
           </div>
 

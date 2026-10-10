@@ -23,7 +23,7 @@ interface HubState {
 const Ctx = createContext<HubState | null>(null);
 
 /**
- * The workspace's view state lives in the URL (`/swap?tab=requests&mode=open`), so every link, reload and shared URL lands on
+ * The workspace's view state lives in the URL (`/launchpad?tab=requests&mode=open`), so every link, reload and shared URL lands on
  * the same view. Updates use `history.replaceState`, which Next.js feeds back into `useSearchParams`: instant, no server
  * round trip, and no history entry per click.
  */
