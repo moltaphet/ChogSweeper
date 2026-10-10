@@ -32,6 +32,12 @@ export function useTradeActions(trade: SwapRecord) {
   const canDecline = !isMaker && isDesignated && trade.status === "pending";
   const canAccept = !isMaker && !!address && (isOpen || isDesignated) && trade.status === "pending";
 
+  // A collection that is not in the verified registry may be a look-alike or a hostile contract whose tokens never
+  // actually move on delivery. The contract cannot detect that, so accepting such a trade needs an explicit review.
+  const hasUnverified = [...trade.offered, ...trade.wanted].some((a) => a.verified === false);
+  const requiresReview = canAccept && hasUnverified;
+  const isExpired = trade.status === "expired";
+
   // Exact msg.value the contract will demand for this viewer: wantedMon + fee, where the fee is zero for
   // Chog holders and during promotions. Asking the contract avoids guessing and avoids reverts.
   const quote = useQuery({
@@ -65,7 +71,7 @@ export function useTradeActions(trade: SwapRecord) {
   };
 
   return {
-    canAccept, canDecline, canCancel,
+    canAccept, canDecline, canCancel, requiresReview, isExpired,
     hasActions: canAccept || canDecline || canCancel,
     busy, error,
     /** Fee on top of the maker's requested MON for this viewer, once quoted. */

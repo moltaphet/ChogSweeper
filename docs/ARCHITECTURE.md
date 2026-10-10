@@ -125,7 +125,7 @@ Response: `{ "swaps": [...], "nextCursor": "12" | null }`, newest first.
 - `tokenURI` fetching blocks private IPs by resolving DNS first; a DNS-rebinding race remains, so run the worker in
   a network segment with no access to internal services.
 - Images are referenced by normalised URL, not re-hosted. Put an image CDN/proxy in front if gateways are slow.
-- No rate limiting on the API yet; add `@upstash/ratelimit` before exposing it publicly.
+- The Next.js API rate-limits its outbound-fetching and list endpoints (Redis when configured, per-instance memory otherwise). The limit keys on `x-forwarded-for`, so deploy behind a proxy that sets it (e.g. Vercel).
 - Not exercised against a live Monad RPC or a running Docker daemon yet (see the test summary).
 
 
@@ -172,3 +172,24 @@ then the metadata JSON over `ipfs://` / `ar://` / `data:` / `http(s)`, then the 
   ~124 kB of JS against ~244 kB for the app.
 * Fonts are self-hosted from npm (`@fontsource-variable/*`), so builds and dev servers work offline and visitors make no
   request to Google.
+
+
+## Trust model and known limits of the escrow
+
+The contract guarantees that a trade settles atomically on its stated terms and that the owner can never change an
+existing trade. It cannot guarantee that a token behaves like a real NFT.
+
+* **Fake or hostile collections.** `createSwap` checks `ownerOf` after the deposit, but a hostile ERC-721 can answer that
+  honestly and then do nothing on `transferFrom` at settlement, so a taker who pays MON receives nothing. No on-chain check
+  prevents this. The UI therefore marks collections outside the verified registry as "Unverified", and a taker must tick an
+  explicit confirmation (and cannot accept from a list row) before accepting such a trade.
+* **Fee exemption for Chog holders** only looks at the taker's balance at the moment of acceptance. On testnet `MockChog.mint`
+  is open to everyone, so the exemption is trivially obtainable there. On mainnet, anyone who can borrow or cheaply buy a Chog
+  for one transaction can skip the fee. Treat the exemption as a courtesy, not as access control.
+* **Expired trades hold their escrow** until the maker calls `cancelSwap`. Nothing is returned automatically. The UI says so
+  on expired offers and offers a "Reclaim assets" action.
+* **Open Counter trades can be taken by anyone**, including bots watching the public feed. An open offer with a low or zero
+  ask will be taken by whoever lands first.
+* **The fee is paid by the taker** on top of `wantedMon` (the maker always receives exactly `wantedMon`). A pure NFT-for-NFT
+  trade therefore costs only the taker.
+* No ERC-1155, no ERC-2981 royalties, no "any token of a collection" offers: wanted tokens are specific (contract, id) pairs.

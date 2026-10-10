@@ -68,7 +68,7 @@ function TradeRow({ trade, onOpen }: { trade: SwapRecord; onOpen: (t: SwapRecord
       </button>
 
       <div className="mt-3">
-        <TradeActions trade={trade} />
+        <TradeActions trade={trade} onReview={() => onOpen(trade)} />
       </div>
     </li>
   );
