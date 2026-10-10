@@ -1,0 +1,193 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import { ChogCard } from "./ChogCard";
+
+/** Ids of the Chogs that rain down. The same id always draws the same Chog. */
+const IDS = [7, 21, 42, 88, 3, 19, 64, 105, 12, 77, 31, 55, 9, 120, 26, 71, 4, 93, 38, 14, 67, 49, 101, 58];
+const COINS = 5;
+
+type Piece = { el: HTMLElement; w: number; h: number; body?: import("matter-js").Body };
+
+/**
+ * A pile of Chogs that falls into view: every card is a real physics body (matter-js), so they tumble, collide, bounce and
+ * settle into a jumbled heap on the floor, then can be grabbed and thrown with the mouse. The cards are ordinary DOM
+ * elements moved with transforms each frame, so the art stays vector-sharp at any resolution.
+ *
+ * The drop starts when the section scrolls into view (at once if it already is). With `prefers-reduced-motion` the pile is
+ * simulated ahead of time and shown already settled. The library is loaded on demand so it never weighs on the first paint.
+ */
+export function ChogPile() {
+  const box = useRef<HTMLDivElement>(null);
+  const pieces = useRef<Piece[]>([]);
+
+  useEffect(() => {
+    const host = box.current;
+    if (!host) return;
+    let disposed = false;
+    let stop = () => {};
+    let started = false;
+
+    const run = async () => {
+      if (started) return;
+      started = true;
+      const Matter = (await import("matter-js")).default;
+      if (disposed) return;
+      const { Engine, World, Bodies, Body, Mouse, MouseConstraint, Events } = Matter;
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const finePointer = window.matchMedia("(pointer: fine)").matches;
+
+      const build = (instant: boolean) => {
+        const W = host.clientWidth;
+        const H = host.clientHeight;
+        const cardW = Math.max(84, Math.min(140, W / 9.5));
+        const count = W < 640 ? 9 : W < 1100 ? 12 : 15;
+
+        const engine = Engine.create({ gravity: { x: 0, y: 1.25 }, enableSleeping: true });
+        const wall = 200;
+        const thick = 80;
+        World.add(engine.world, [
+          Bodies.rectangle(W / 2, H + thick / 2 - 6, W + wall * 2, thick, { isStatic: true, friction: 0.8 }), // floor
+          Bodies.rectangle(-thick / 2, -H, thick, H * 6, { isStatic: true }), // left wall
+          Bodies.rectangle(W + thick / 2, -H, thick, H * 6, { isStatic: true }), // right wall
+        ]);
+
+        const els = pieces.current;
+        const bodies: Array<{ piece: Piece; body: import("matter-js").Body; delay: number; added: boolean }> = [];
+        els.forEach((p, i) => {
+          const isCoin = i >= IDS.length;
+          const w = isCoin ? cardW * 0.42 : cardW;
+          const h = isCoin ? w : cardW * 1.2;
+          p.w = w;
+          p.h = h;
+          p.el.style.width = `${w}px`;
+          p.el.style.height = `${h}px`;
+          const body = isCoin
+            ? Bodies.circle(0, 0, w / 2, { restitution: 0.5, friction: 0.4, density: 0.0012 })
+            : Bodies.rectangle(0, 0, w, h, { chamfer: { radius: 16 }, restitution: 0.32, friction: 0.7, frictionAir: 0.012, density: 0.001 });
+          p.body = body;
+          Body.setPosition(body, { x: w + Math.random() * (W - w * 2), y: -h - Math.random() * H * 0.9 });
+          Body.setAngle(body, (Math.random() - 0.5) * 1.4);
+          Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.12);
+          Body.setVelocity(body, { x: (Math.random() - 0.5) * 3, y: 2 + Math.random() * 3 });
+          const live = isCoin ? i - IDS.length < COINS : i < count;
+          if (live) bodies.push({ piece: p, body, delay: instant ? 0 : 120 + i * 85 + Math.random() * 120, added: false });
+          p.el.style.opacity = "0";
+        });
+
+        // Draw: DOM transforms from the bodies.
+        const paint = () => {
+          for (const b of bodies) {
+            if (!b.added) continue;
+            const { x, y } = b.body.position;
+            b.piece.el.style.transform = `translate3d(${x - b.piece.w / 2}px, ${y - b.piece.h / 2}px, 0) rotate(${b.body.angle}rad)`;
+          }
+        };
+        const add = (b: (typeof bodies)[number]) => {
+          b.added = true;
+          World.add(engine.world, b.body);
+          b.piece.el.style.opacity = "1";
+        };
+
+        if (instant) {
+          bodies.forEach(add);
+          for (let i = 0; i < 900; i++) Engine.update(engine, 1000 / 60);
+          paint();
+          return () => {};
+        }
+
+        // Grab and throw (mouse only: on touch screens the pile must never steal page scrolling).
+        let mc: import("matter-js").MouseConstraint | null = null;
+        if (finePointer) {
+          const mouse = Mouse.create(host);
+          const m = mouse as unknown as Record<string, EventListener>;
+          // matter-js otherwise swallows wheel and touch events, which would freeze page scrolling over the pile.
+          for (const ev of ["wheel", "mousewheel", "DOMMouseScroll"]) host.removeEventListener(ev, m.mousewheel as EventListener);
+          for (const ev of ["touchstart", "touchmove", "touchend"]) host.removeEventListener(ev, m[ev === "touchstart" ? "mousedown" : ev === "touchmove" ? "mousemove" : "mouseup"] as EventListener);
+          mc = MouseConstraint.create(engine, { mouse, constraint: { stiffness: 0.18, damping: 0.1, render: { visible: false } } });
+          World.add(engine.world, mc);
+          host.style.cursor = "grab";
+          Events.on(mc, "startdrag", () => (host.style.cursor = "grabbing"));
+          Events.on(mc, "enddrag", () => (host.style.cursor = "grab"));
+        }
+
+        let raf = 0;
+        let last = performance.now();
+        const t0 = last;
+        const tick = (now: number) => {
+          const elapsed = now - t0;
+          for (const b of bodies) if (!b.added && elapsed >= b.delay) add(b);
+          const dt = Math.min(32, now - last);
+          last = now;
+          Engine.update(engine, dt);
+          paint();
+          raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+        return () => {
+          cancelAnimationFrame(raf);
+          if (mc) {
+            Events.off(mc, "startdrag");
+            Events.off(mc, "enddrag");
+          }
+          host.style.cursor = "";
+          World.clear(engine.world, false);
+          Engine.clear(engine);
+        };
+      };
+
+      let teardown = build(reduced);
+      let width = host.clientWidth;
+      const ro = new ResizeObserver(() => {
+        if (Math.abs(host.clientWidth - width) < 40) return;
+        width = host.clientWidth;
+        teardown();
+        teardown = build(true); // after a resize, show the settled pile straight away
+      });
+      ro.observe(host);
+      stop = () => {
+        ro.disconnect();
+        teardown();
+      };
+    };
+
+    // Start when the pile is on screen (immediately if it already is).
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          io.disconnect();
+          void run();
+        }
+      },
+      { threshold: 0.2 },
+    );
+    io.observe(host);
+
+    return () => {
+      disposed = true;
+      io.disconnect();
+      stop();
+    };
+  }, []);
+
+  return (
+    <section aria-label="A pile of Chog NFTs you can grab and throw" className="relative mx-auto max-w-[1320px] px-3 pb-20 sm:px-6">
+      <div className="pointer-events-none absolute inset-x-0 top-3 z-10 flex justify-center" aria-hidden>
+        <span className="rounded-full bg-monad-ink px-3.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white shadow-card">Grab and throw the Chogs</span>
+      </div>
+      <div ref={box} className="relative h-[430px] w-full touch-pan-y select-none overflow-hidden rounded-[32px] border border-monad-border/70 bg-gradient-to-b from-white/50 to-monad-tint/80 sm:h-[540px] sm:rounded-[44px]">
+        {IDS.map((id, i) => (
+          <div key={id} ref={(el) => { if (el) pieces.current[i] = Object.assign(pieces.current[i] ?? { w: 0, h: 0 }, { el }); }} className="absolute left-0 top-0 will-change-transform" style={{ opacity: 0 }}>
+            <ChogCard id={id} compact className="h-full w-full !shadow-[0_18px_30px_-14px_rgba(60,30,200,0.55)]" />
+          </div>
+        ))}
+        {Array.from({ length: COINS }, (_, i) => (
+          <div key={`coin${i}`} ref={(el) => { if (el) pieces.current[IDS.length + i] = Object.assign(pieces.current[IDS.length + i] ?? { w: 0, h: 0 }, { el }); }} className="absolute left-0 top-0 will-change-transform" style={{ opacity: 0 }}>
+            <div className="flex h-full w-full items-center justify-center rounded-full border-2 border-white/80 bg-gradient-to-br from-[#FFE08A] via-[#F5B544] to-[#D98E1C] font-display text-[10px] font-black text-[#7A4B00] shadow-[0_10px_22px_-8px_rgba(245,181,68,0.85)]">MON</div>
+          </div>
+        ))}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-monad-border" aria-hidden />
+      </div>
+    </section>
+  );
+}
