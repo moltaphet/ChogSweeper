@@ -35,7 +35,6 @@ export function SwapBuilder() {
   const queryClient = useQueryClient();
 
   const { mode, setMode } = useHub();
-  const { connectors, connect } = useConnect();
   const { collections, add: addCollection } = useCollections();
   const [newCollection, setNewCollection] = useState("");
 
@@ -225,7 +224,6 @@ export function SwapBuilder() {
 
   const wrongChain = isConnected && chainId !== monadTestnet.id;
 
-  const connectWallet = () => connectors[0] && connect({ connector: connectors[0], chainId: monadTestnet.id });
 
   /** Resolve a token for an open offer's wanted list. No ownership check: anyone may end up holding it. */
   async function addOpenWanted(contract: string, tokenId: string) {
@@ -285,7 +283,7 @@ export function SwapBuilder() {
             emptyMessage="No NFTs to show."
             emptyContent={
               !isConnected ? (
-                <EmptyState icon={Wallet} title="Connect to load your NFTs" body="Your Chogs and other Monad NFTs appear here, ready to bundle into a trade." action={{ label: "Connect wallet", onClick: connectWallet, icon: Wallet }} />
+                <EmptyState icon={Wallet} title="Connect your wallet first" body="Use the Connect wallet button at the top right of the page. Your Chogs and other Monad NFTs then appear here, ready to bundle into a trade." />
               ) : mine.isError ? (
                 <EmptyState icon={RefreshCw} title="Couldn’t load your NFTs" body="The lookup failed. Try again, or add a token by hand." action={{ label: "Try again", onClick: () => mine.refetch(), icon: RefreshCw }} secondary={{ label: "Add by contract + ID", onClick: () => setAddMineSignal((n) => n + 1), icon: ImagePlus }} />
               ) : (
@@ -614,8 +612,14 @@ function ActionButton(props: {
   onCreate: () => void;
   createLabel: string;
 }) {
-  const { connect, switchChain } = useWalletActions();
-  if (!props.connected) return <button className="btn-primary" onClick={connect}>Connect wallet</button>;
+  const { switchChain } = useWalletActions();
+  if (!props.connected) {
+    return (
+      <p className="inline-flex items-center gap-2 rounded-xl bg-status-warnBg px-4 py-2.5 text-sm font-semibold text-amber-900" role="status">
+        <Wallet className="h-4 w-4 shrink-0" aria-hidden /> Connect your wallet first (top right)
+      </p>
+    );
+  }
   if (props.wrongChain) return <button className="btn-primary" onClick={switchChain}>Switch to Monad Testnet</button>;
   if (props.busy) {
     return (
