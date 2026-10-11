@@ -62,16 +62,16 @@ export function Navbar() {
   return (
     <header className={`sticky top-0 z-40 transition duration-300 ${scrolled || menu || inApp ? "border-b border-monad-border/70 bg-white/75 shadow-[0_8px_30px_-18px_rgba(94,67,243,0.35)] backdrop-blur-xl" : "border-b border-transparent bg-transparent"}`}>
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2">Skip to content</a>
-      <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between gap-3 px-4 sm:px-6">
+      <div className="mx-auto flex h-16 max-w-[1320px] items-center justify-between gap-2 px-4 sm:gap-3 sm:px-6">
         <Link href="/" aria-label="ChogSweeper home" className="rounded-xl">
-          <Wordmark />
+          <Wordmark iconOnlyOnTiny />
         </Link>
 
         <nav aria-label="Primary" className="hidden xl:block">
           <NavLinks items={NAV} active={active} unread={unread} />
         </nav>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-1.5 sm:gap-2.5">
           <span className="hidden lg:block"><NetworkSelector /></span>
           {inApp ? (
             <WalletButton />

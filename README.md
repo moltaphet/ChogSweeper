@@ -13,7 +13,7 @@ Peer-to-peer NFT and MON swaps on Monad: escrow contract, indexer, API and trade
 | `scripts/` | `sync-shared.mjs` copies `shared/nft-resolver.ts` into `indexer/` and `web/` |
 | `web/` | Next.js app and API routes |
 | `shared/` | `nft-resolver.ts`, the canonical metadata resolver (a copy lives in `web/lib/server/`) |
-| `ops/` | deployment exporter, smoke test, local full-stack runner, `contract-tests/` (Foundry-free contract tests) |
+| `ops/` | deployment exporter, smoke test, local full-stack runner, `contract-tests/` (Foundry-free contract tests), `ui-e2e/` (browser tests) |
 | `prisma/` | Prisma model of the indexer database |
 | `config/` | verified-collection seed list per chain |
 
@@ -40,5 +40,6 @@ Copy `web/.env.example` to `web/.env.local` and fill it in. Never commit a `.env
 - `cd web && npx vitest run` runs the web tests; `npm run typecheck` type-checks.
 - `make test` runs contracts, indexer and web tests; `make e2e-local` runs the whole stack on a local chain.
 - `make test-js` runs the contract behaviour tests without Foundry (in-process EVM).
+- `make test-ui` drives the real app in a browser against a local chain (fake injected wallet): create, accept, decline, cancel, fee refund, verified-only, expiry. `cd ops/ui-e2e && npm test -- --all` also walks every page at desktop and phone widths.
 - `make dry-run` simulates the deployment against Monad Testnet; `make deploy` broadcasts it (needs `PRIVATE_KEY`).
 - `make smoke-testnet` runs a real trade between two funded wallets.

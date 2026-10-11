@@ -2,9 +2,11 @@
 
 import { Check, ChevronDown, Copy, ExternalLink, LogOut, Wallet } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useAccount, useBalance, useConnect, useDisconnect } from "wagmi";
+import { useBalance, useConnect, useDisconnect } from "wagmi";
+import { useAccount } from "@/lib/useAccount";
 import { monadTestnet } from "@/lib/config";
 import { formatMon, shortAddress } from "@/lib/format";
+import { MonTicker } from "@/components/site/MonTicker";
 
 /** Deterministic two-colour avatar so each wallet looks like itself. */
 function avatarGradient(address: string) {
@@ -63,7 +65,7 @@ export function WalletButton() {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex items-center gap-2 rounded-xl border border-monad-border bg-white/90 py-1.5 pl-1.5 pr-3 text-sm font-semibold shadow-card transition duration-200 hover:border-monad-primary"
+        className="flex items-center gap-1.5 rounded-xl border border-monad-border bg-white/90 py-1.5 pl-1.5 pr-2 text-sm font-semibold shadow-card transition duration-200 hover:border-monad-primary sm:gap-2 sm:pr-3"
       >
         <span className="h-7 w-7 rounded-lg" style={{ background: avatarGradient(address) }} aria-hidden />
         <span className="font-mono text-[13px]">{shortAddress(address)}</span>
@@ -75,8 +77,7 @@ export function WalletButton() {
           <div className="border-b border-monad-border/70 bg-monad-bg/60 px-4 py-3">
             <p className="label">Balance</p>
             <p className="mt-0.5 flex items-center gap-1.5 font-display text-lg font-bold">
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-coin text-[10px] font-black text-white" aria-hidden>M</span>
-              {balance ? formatMon(balance.value, 4) : "…"} <span className="text-sm font-semibold text-coin-ink">MON</span>
+                            {balance ? formatMon(balance.value, 4) : "…"} <MonTicker className="h-5" />
             </p>
           </div>
           <button

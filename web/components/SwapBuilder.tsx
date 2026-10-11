@@ -3,11 +3,13 @@
 import { useMemo, useState } from "react";
 import { AlertCircle, ArrowLeftRight, CheckCircle2, Gift, Globe, ImagePlus, Link2, Loader2, Plus, RefreshCw, Search, UserRound, Users, Wallet } from "lucide-react";
 import { isAddress, type Address } from "viem";
-import { useAccount, useConnect, usePublicClient, useReadContracts, useSwitchChain, useWriteContract } from "wagmi";
+import { useConnect, usePublicClient, useReadContracts, useSwitchChain, useWriteContract } from "wagmi";
+import { useAccount } from "@/lib/useAccount";
 import { erc721Abi, sweeperAbi } from "@/lib/abi";
 import { MAX_ASSETS_PER_SIDE, SWEEPER_ADDRESS, ZERO_ADDRESS, monadTestnet } from "@/lib/config";
 import { formatMon, nftKey, parseMon, sameAddress, shortAddress } from "@/lib/format";
 import { useCollections, useResolvedAddress } from "@/lib/hooks";
+import { confirmTx } from "@/lib/confirm";
 import { useWalletNFTs, type WalletNFTs } from "@/lib/useWalletNFTs";
 import { resolveTokenFromApi, ResolveError } from "@/lib/api";
 import type { NFTItem, SwapOffer } from "@/lib/types";
@@ -17,6 +19,7 @@ import { AddTokenForm } from "./AddTokenForm";
 import { EmptyState } from "./EmptyState";
 import { useHub, type OfferMode } from "./HubContext";
 import { NFTSelectorGrid } from "./NFTSelectorGrid";
+import { MonTicker } from "@/components/site/MonTicker";
 
 const EXPIRY_OPTIONS = [
   { label: "1 hour", seconds: 3600 },
@@ -172,7 +175,7 @@ export function SwapBuilder() {
           args: [SWEEPER_ADDRESS!, true],
           chainId: monadTestnet.id,
         });
-        await publicClient!.waitForTransactionReceipt({ hash });
+        await confirmTx(publicClient!, hash);
       }
       await approvals.refetch();
     } catch (e) {
@@ -204,7 +207,7 @@ export function SwapBuilder() {
         value: due,
         chainId: monadTestnet.id,
       });
-      await publicClient!.waitForTransactionReceipt({ hash });
+      await confirmTx(publicClient!, hash);
       setCreatedHash(hash);
       mine.clear();
       theirs.clear();
@@ -256,7 +259,7 @@ export function SwapBuilder() {
         <span className="ticket-notch -top-3.5 hidden lg:block" aria-hidden />
 
         {/* ------------------------------ You Give ------------------------------ */}
-        <section className="p-5 sm:p-7" aria-labelledby="give-heading">
+        <section className="min-w-0 p-5 sm:p-7" aria-labelledby="give-heading">
           <header className="mb-4 flex items-start justify-between gap-3">
             <div>
               <p className="eyebrow">Your side</p>
@@ -326,7 +329,7 @@ export function SwapBuilder() {
         </section>
 
         {/* ----------------------------- You Receive ---------------------------- */}
-        <section className="border-t border-monad-border/70 p-5 sm:p-7 lg:border-t-0" aria-labelledby="receive-heading">
+        <section className="min-w-0 border-t border-monad-border/70 p-5 sm:p-7 lg:border-t-0" aria-labelledby="receive-heading">
           <header className="mb-4 flex items-start justify-between gap-3">
             <div>
               <p className="eyebrow">{mode === "direct" ? "Their side" : "Your ask"}</p>
@@ -473,13 +476,13 @@ export function SwapBuilder() {
               </label>
               <span title="Paid by you when the swap is created, refunded in full if it is cancelled or declined, kept only when it is accepted. Zero for Chog holders and during promotions.">
                 Platform fee:{" "}
-                <strong className="text-monad-ink">{feeWei === null ? "…" : feeWei === 0n ? "Free" : `${formatMon(feeWei, 6)} MON`}</strong>
+                <strong className="text-monad-ink">{feeWei === null ? "…" : feeWei === 0n ? "Free" : <>{formatMon(feeWei, 6)} <MonTicker /></>}</strong>
                 {feeWei !== null && feeWei > 0n && <span className="text-monad-muted"> (refunded if rejected)</span>}
               </span>
               <span title="Monad charges for the gas limit, so this is the amount reserved at the current gas price.">
                 Est. gas:{" "}
                 <strong className="text-monad-ink">
-                  {gas.data ? `${gas.data.units.toLocaleString()} (~${formatMon(gas.data.cost, 6)} MON)` : needsApproval ? "after approval" : "—"}
+                  {gas.data ? <>{gas.data.units.toLocaleString()} (~{formatMon(gas.data.cost, 6)} <MonTicker />)</> : needsApproval ? "after approval" : "—"}
                 </strong>
               </span>
             </div>
@@ -495,6 +498,7 @@ export function SwapBuilder() {
                 wrongChain={wrongChain}
                 busy={busy}
                 needsApproval={needsApproval}
+                blockApprove={notVerified.length > 0}
                 disabledReason={problem}
                 onApprove={approveAll}
                 onCreate={createSwap}
@@ -577,7 +581,7 @@ function MonField({ label, value, onChange, invalid }: { label: string; value: s
           onChange={(e) => onChange(e.target.value)}
           aria-invalid={invalid}
         />
-        <span className="pointer-events-none absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5 text-xs font-bold text-coin-ink"><span className="flex h-4 w-4 items-center justify-center rounded-full bg-coin text-[9px] font-black text-white" aria-hidden>M</span>MON</span>
+        <span className="pointer-events-none absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5 text-xs font-bold text-coin-ink"><MonTicker className="h-4" /></span>
       </div>
     </div>
   );
@@ -603,6 +607,8 @@ function ActionButton(props: {
   wrongChain: boolean;
   busy: null | "approve" | "create";
   needsApproval: boolean;
+  /** Approving a collection the contract will refuse anyway would only cost the user gas. */
+  blockApprove?: boolean;
   disabledReason: string | null;
   onApprove: () => void;
   onCreate: () => void;
@@ -619,7 +625,7 @@ function ActionButton(props: {
     );
   }
   if (props.needsApproval) {
-    return <button className="btn-primary" onClick={props.onApprove}>Approve NFTs</button>;
+    return <button className="btn-primary" onClick={props.onApprove} disabled={props.blockApprove}>Approve NFTs</button>;
   }
   return (
     <button className="btn-primary" onClick={props.onCreate} disabled={!!props.disabledReason}>

@@ -2,6 +2,7 @@ import { BadgeCheck, Coins } from "lucide-react";
 import { formatMon, nftKey, shortAddress } from "@/lib/format";
 import type { NFTItem, NFTRef } from "@/lib/types";
 import { NftImage } from "./NftImage";
+import { MonTicker } from "@/components/site/MonTicker";
 
 interface Props {
   title: string;
@@ -43,7 +44,7 @@ export function AssetSummaryCard({ title, nfts, monWei, subtitle, compact }: Pro
           )}
           {monWei > 0n && (
             <p className="inline-flex items-center gap-1.5 rounded-lg bg-monad-tint px-2.5 py-1 text-sm font-semibold text-monad-deep">
-              <Coins className="h-4 w-4" /> {formatMon(monWei)} MON
+              <Coins className="h-4 w-4" /> {formatMon(monWei)} <MonTicker />
             </p>
           )}
         </div>

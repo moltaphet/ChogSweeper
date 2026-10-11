@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeftRight, Clock, Coins, ExternalLink, X } from "lucide-react";
-import { useAccount } from "wagmi";
+import { useAccount } from "@/lib/useAccount";
 import { ZERO_ADDRESS, monadTestnet } from "@/lib/config";
 import { formatMon, nftKey, sameAddress, shortAddress } from "@/lib/format";
 import { expiryLabel } from "@/lib/time";
@@ -13,6 +13,7 @@ import { NftImage } from "./NftImage";
 import { StatusBadge } from "./StatusBadge";
 import { TradeActions } from "./TradeActions";
 import { VerifiedBadge } from "./VerifiedBadge";
+import { MonTicker } from "@/components/site/MonTicker";
 
 const EXPLORER = monadTestnet.blockExplorers.default.url;
 const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -135,14 +136,14 @@ function ModalBody({ trade, onClose }: { trade: SwapRecord; onClose: () => void 
             <dl className="rounded-xl border border-monad-border bg-monad-bg/60 px-4 py-3 text-sm">
               <div className="flex justify-between">
                 <dt className="font-semibold">You pay</dt>
-                <dd className="font-bold text-monad-deep">{actions.totalDue === null ? "…" : actions.totalDue === 0n ? "Nothing" : `${formatMon(actions.totalDue, 6)} MON`}</dd>
+                <dd className="font-bold text-monad-deep">{actions.totalDue === null ? "…" : actions.totalDue === 0n ? "Nothing" : <>{formatMon(actions.totalDue, 6)} <MonTicker /></>}</dd>
               </div>
               <p className="mt-1 text-xs text-monad-muted">The platform fee was already paid by the maker. You never pay a fee to accept.</p>
             </dl>
           )}
 
           {trade.feePaid != null && trade.feePaid > 0n && (
-            <p className="text-xs text-monad-muted">Platform fee paid by the maker: {formatMon(trade.feePaid, 6)} MON</p>
+            <p className="text-xs text-monad-muted">Platform fee paid by the maker: {formatMon(trade.feePaid, 6)} <MonTicker /></p>
           )}
 
           <ul className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-monad-muted">
@@ -202,7 +203,7 @@ function Side(props: {
           )}
           {props.mon > 0n && (
             <p className="inline-flex items-center gap-1.5 rounded-lg bg-monad-tint px-3 py-1.5 text-sm font-semibold text-monad-deep">
-              <Coins className="h-4 w-4" /> {formatMon(props.mon)} MON
+              <Coins className="h-4 w-4" /> {formatMon(props.mon)} <MonTicker />
             </p>
           )}
         </div>

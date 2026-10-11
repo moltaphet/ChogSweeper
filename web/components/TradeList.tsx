@@ -7,7 +7,7 @@ import type { SwapRecord } from "@/lib/types";
 import { AssetSummaryCard } from "./AssetSummaryCard";
 import { StatusBadge } from "./StatusBadge";
 import { TradeActions } from "./TradeActions";
-import { useAccount } from "wagmi";
+import { useAccount } from "@/lib/useAccount";
 
 interface Props {
   trades: readonly SwapRecord[];

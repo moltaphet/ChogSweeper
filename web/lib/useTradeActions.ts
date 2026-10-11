@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Address } from "viem";
-import { useAccount, usePublicClient, useWriteContract } from "wagmi";
+import { usePublicClient, useWriteContract } from "wagmi";
+import { useAccount } from "./useAccount";
+import { confirmTx } from "./confirm";
 import { erc721Abi, sweeperAbi } from "./abi";
 import { SWEEPER_ADDRESS, ZERO_ADDRESS, monadTestnet } from "./config";
 import { sameAddress } from "./format";
@@ -67,7 +69,7 @@ export function useTradeActions(trade: SwapRecord) {
 
   const send = async (functionName: "cancelSwap" | "declineSwap") => {
     const hash = await writeContractAsync({ address: SWEEPER_ADDRESS!, abi: sweeperAbi, functionName, args: [trade.id], chainId: monadTestnet.id });
-    await publicClient!.waitForTransactionReceipt({ hash });
+    await confirmTx(publicClient!, hash);
   };
 
   return {
@@ -91,7 +93,7 @@ export function useTradeActions(trade: SwapRecord) {
             const h = await writeContractAsync({
               address: nft, abi: erc721Abi, functionName: "setApprovalForAll", args: [SWEEPER_ADDRESS!, true], chainId: monadTestnet.id,
             });
-            await publicClient!.waitForTransactionReceipt({ hash: h });
+            await confirmTx(publicClient!, h);
           }
         }
         // Re-quote right before sending: the fee may have changed since the modal opened.
@@ -101,7 +103,7 @@ export function useTradeActions(trade: SwapRecord) {
         const hash = await writeContractAsync({
           address: SWEEPER_ADDRESS!, abi: sweeperAbi, functionName: "acceptSwap", args: [trade.id], value: required, chainId: monadTestnet.id,
         });
-        await publicClient!.waitForTransactionReceipt({ hash });
+        await confirmTx(publicClient!, hash);
       }),
   };
 }

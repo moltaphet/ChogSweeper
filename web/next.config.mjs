@@ -17,6 +17,8 @@ const nextConfig = {
     for (const m of ["@x402/core/client", "@x402/evm", "@x402/evm/exact/client", "@x402/evm/upto/client", "@x402/svm/exact/client"]) {
       config.resolve.alias[m] = false;
     }
+    // @metamask/sdk (pulled in by wagmi's connector barrel) optionally imports React Native storage; this app never runs there.
+    config.resolve.alias["@react-native-async-storage/async-storage"] = false;
     config.externals.push("pino-pretty", "lokijs", "encoding");
     return config;
   },

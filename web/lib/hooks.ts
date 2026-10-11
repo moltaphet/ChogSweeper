@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createPublicClient, http, isAddress, type Address, type PublicClient } from "viem";
 import { mainnet } from "viem/chains";
 import { normalize } from "viem/ens";
+import { getLogsChunked } from "./chainLogs";
 import { usePublicClient } from "wagmi";
 import { sweeperAbi } from "./abi";
 import { CHOG_COLLECTION, DEFAULT_COLLECTIONS, DEPLOY_BLOCK, SWEEPER_ADDRESS, ZERO_ADDRESS, monadTestnet } from "./config";
@@ -89,7 +90,7 @@ async function fetchTradesFromChain(client: PublicClient, user: Address): Promis
   const event = sweeperAbi.find((x) => x.type === "event" && x.name === "TradeCreated")!;
   const [asMaker, asTaker] = await Promise.all(
     [{ maker: user }, { taker: user }].map((args) =>
-      client.getLogs({ address: SWEEPER_ADDRESS!, event, args, fromBlock: DEPLOY_BLOCK, toBlock: "latest" }),
+      getLogsChunked(client, (fromBlock, toBlock) => client.getLogs({ address: SWEEPER_ADDRESS!, event, args, fromBlock, toBlock }), DEPLOY_BLOCK),
     ),
   );
   type Created = { id: bigint; block: bigint; args: (typeof asMaker)[number]["args"] };

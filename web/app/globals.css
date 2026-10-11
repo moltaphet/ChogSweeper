@@ -44,7 +44,7 @@ body {
   }
 
   /* Section headings share one voice. */
-  .eyebrow { @apply font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-monad-primary; }
+  .eyebrow { @apply font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-[#3A1FB8]; }
   .h-section { @apply text-balance font-display text-3xl font-extrabold tracking-tight text-monad-ink sm:text-4xl; }
 
   /* The trade ticket: a perforated seam with die-cut notches between the two halves of one deal. */
@@ -53,7 +53,7 @@ body {
     background-size: 2px 12px;
     background-repeat: repeat-y;
   }
-  .ticket-notch { @apply absolute left-1/2 h-7 w-7 -translate-x-1/2 rounded-full border border-monad-border bg-[#F7F5FE]; }
+  .ticket-notch { @apply absolute left-1/2 h-7 w-7 -translate-x-1/2 rounded-full border border-monad-border bg-[#D6CBFF]; }
   /* Half of each side notch sits outside the ticket edge, so the border reads as a punched hole. */
 
   /* Deep purple to electric violet. The end stop stays dark enough to read on the lavender page (>= 3.5:1). */

@@ -33,69 +33,93 @@ contract DeployChogSweeper is Script {
     error MockNotAllowedHere(uint256 chainId);
     error FeeTooHighForConfig();
 
+    /// @dev Everything read from the environment, kept in one struct so `run` stays within the stack limit.
+    struct Config {
+        address deployer;
+        address treasury;
+        address finalOwner;
+        address chog;
+        address partner;
+        uint256 fee;
+        bool deployMock;
+    }
+
     function run() external returns (ChogSweeper sweeper, address chog) {
         uint256 deployerKey = vm.envUint("PRIVATE_KEY");
-        address deployer = vm.addr(deployerKey);
-
-        uint256 expectedChain = vm.envOr("EXPECTED_CHAIN_ID", MONAD_TESTNET);
-        if (block.chainid != expectedChain) revert WrongChain(expectedChain, block.chainid);
-
-        uint256 fee = vm.envOr("PLATFORM_FEE_WEI", uint256(0));
-        if (fee > type(uint128).max) revert FeeTooHighForConfig();
-        address treasury = vm.envOr("TREASURY_ADDRESS", deployer);
-        address finalOwner = vm.envOr("OWNER_ADDRESS", deployer);
-        chog = vm.envOr("CHOG_COLLECTION", address(0));
-        bool deployMock = vm.envOr("DEPLOY_MOCK_CHOG", chog == address(0));
-
-        // A faucet-style mint contract has no business anywhere but a test network.
-        if (deployMock && block.chainid != MONAD_TESTNET && block.chainid != ANVIL) revert MockNotAllowedHere(block.chainid);
-
-        address partner = vm.envOr("PARTNER_COLLECTION", address(0));
-        address[] memory extraVerified = vm.envOr("TRADEABLE_COLLECTIONS", ",", new address[](0));
-        address[] memory seedTo = vm.envOr("SEED_MINT_TO", ",", new address[](0));
-        uint256 seedCount = vm.envOr("SEED_MINT_COUNT", uint256(1));
-
-        console2.log("Deployer:        ", deployer);
-        console2.log("Chain id:        ", block.chainid);
-        console2.log("Treasury:        ", treasury);
-        console2.log("Platform fee wei:", fee);
+        Config memory c = _readConfig(vm.addr(deployerKey));
 
         vm.startBroadcast(deployerKey);
 
-        if (deployMock) {
-            MockChog mock = new MockChog();
-            chog = address(mock);
-            for (uint256 i; i < seedTo.length; ++i) {
-                if (seedCount > 0) mock.mintBatch(seedTo[i], seedCount);
-            }
-        }
+        if (c.deployMock) c.chog = _deployMock();
 
         // The deployer owns the contract while it is configured; handover (if any) comes last.
-        sweeper = new ChogSweeper(deployer, treasury, uint128(fee));
-        if (chog != address(0)) sweeper.setChogCollection(chog);
-        if (partner != address(0)) sweeper.setPartnerCollection(partner);
+        sweeper = new ChogSweeper(c.deployer, c.treasury, uint128(c.fee));
+        if (c.chog != address(0)) sweeper.setChogCollection(c.chog);
+        if (c.partner != address(0)) sweeper.setPartnerCollection(c.partner);
 
         // Only verified collections can be traded: Chog, the partner and anything listed in TRADEABLE_COLLECTIONS.
-        address[] memory verified = new address[](extraVerified.length + 2);
-        uint256 n;
-        if (chog != address(0)) verified[n++] = chog;
-        if (partner != address(0)) verified[n++] = partner;
-        for (uint256 i; i < extraVerified.length; ++i) {
-            verified[n++] = extraVerified[i];
-        }
-        assembly ("memory-safe") {
-            mstore(verified, n)
-        }
-        if (n != 0) sweeper.setVerifiedCollections(verified, true);
-        if (finalOwner != deployer) sweeper.transferOwnership(finalOwner);
+        address[] memory verified = _verifiedList(c);
+        if (verified.length != 0) sweeper.setVerifiedCollections(verified, true);
+        if (c.finalOwner != c.deployer) sweeper.transferOwnership(c.finalOwner);
 
         vm.stopBroadcast();
 
-        console2.log("ChogSweeper:     ", address(sweeper));
-        console2.log("Chog collection: ", chog);
-        console2.log("Partner:         ", partner);
-        console2.log("Verified count:  ", n);
-        console2.log("Mock Chog:       ", deployMock);
-        if (finalOwner != deployer) console2.log("Ownership pending; must be accepted by:", finalOwner);
+        _report(c, address(sweeper), verified.length);
+        chog = c.chog;
+    }
+
+    function _readConfig(address deployer) internal returns (Config memory c) {
+        uint256 expectedChain = vm.envOr("EXPECTED_CHAIN_ID", MONAD_TESTNET);
+        if (block.chainid != expectedChain) revert WrongChain(expectedChain, block.chainid);
+
+        c.deployer = deployer;
+        c.fee = vm.envOr("PLATFORM_FEE_WEI", uint256(0));
+        if (c.fee > type(uint128).max) revert FeeTooHighForConfig();
+        c.treasury = vm.envOr("TREASURY_ADDRESS", deployer);
+        c.finalOwner = vm.envOr("OWNER_ADDRESS", deployer);
+        c.chog = vm.envOr("CHOG_COLLECTION", address(0));
+        c.partner = vm.envOr("PARTNER_COLLECTION", address(0));
+        c.deployMock = vm.envOr("DEPLOY_MOCK_CHOG", c.chog == address(0));
+
+        // A faucet-style mint contract has no business anywhere but a test network.
+        if (c.deployMock && block.chainid != MONAD_TESTNET && block.chainid != ANVIL) revert MockNotAllowedHere(block.chainid);
+    }
+
+    /// @dev Deploys MockChog and mints the optional seed tokens (SEED_MINT_TO / SEED_MINT_COUNT).
+    function _deployMock() internal returns (address) {
+        address[] memory seedTo = vm.envOr("SEED_MINT_TO", ",", new address[](0));
+        uint256 seedCount = vm.envOr("SEED_MINT_COUNT", uint256(1));
+        MockChog mock = new MockChog();
+        for (uint256 i; i < seedTo.length; ++i) {
+            if (seedCount > 0) mock.mintBatch(seedTo[i], seedCount);
+        }
+        return address(mock);
+    }
+
+    function _verifiedList(Config memory c) internal returns (address[] memory list) {
+        address[] memory extra = vm.envOr("TRADEABLE_COLLECTIONS", ",", new address[](0));
+        list = new address[](extra.length + 2);
+        uint256 n;
+        if (c.chog != address(0)) list[n++] = c.chog;
+        if (c.partner != address(0)) list[n++] = c.partner;
+        for (uint256 i; i < extra.length; ++i) {
+            list[n++] = extra[i];
+        }
+        assembly ("memory-safe") {
+            mstore(list, n)
+        }
+    }
+
+    function _report(Config memory c, address sweeper, uint256 verifiedCount) internal view {
+        console2.log("Deployer:        ", c.deployer);
+        console2.log("Chain id:        ", block.chainid);
+        console2.log("Treasury:        ", c.treasury);
+        console2.log("Platform fee wei:", c.fee);
+        console2.log("ChogSweeper:     ", sweeper);
+        console2.log("Chog collection: ", c.chog);
+        console2.log("Partner:         ", c.partner);
+        console2.log("Verified count:  ", verifiedCount);
+        console2.log("Mock Chog:       ", c.deployMock);
+        if (c.finalOwner != c.deployer) console2.log("Ownership pending; must be accepted by:", c.finalOwner);
     }
 }

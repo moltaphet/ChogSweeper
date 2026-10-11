@@ -10,6 +10,7 @@ import { LINKS } from "@/lib/site";
 import { useHub } from "../HubContext";
 import { useUnread } from "../UnreadContext";
 import { LiveDot } from "../site/LiveDot";
+import { MonTicker } from "@/components/site/MonTicker";
 
 /** The Launchpad's front door: live numbers, the two ways to start a trade, and a card for every other tool. */
 export function Overview() {
@@ -23,7 +24,7 @@ export function Overview() {
     { label: "Trades completed", value: t ? t.completed.toLocaleString() : "–" },
     { label: "Open trades", value: t ? t.open.toLocaleString() : "–" },
     { label: "Collectors", value: t ? t.traders.toLocaleString() : "–" },
-    { label: "MON traded", value: t ? `${formatMon(BigInt(t.volumeWei), 2)} MON` : "–" },
+    { label: "MON traded", value: t ? <>{formatMon(BigInt(t.volumeWei), 2)} <MonTicker className="h-6" /></> : "–" },
   ];
 
   return (

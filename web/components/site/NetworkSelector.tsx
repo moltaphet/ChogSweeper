@@ -2,7 +2,8 @@
 
 import { Check, ChevronDown, TriangleAlert } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useAccount, useSwitchChain } from "wagmi";
+import { useSwitchChain } from "wagmi";
+import { useAccount } from "@/lib/useAccount";
 import { monadTestnet } from "@/lib/config";
 import { LiveDot, useLiveLook } from "./LiveDot";
 

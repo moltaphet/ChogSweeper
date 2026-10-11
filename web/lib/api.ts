@@ -1,5 +1,6 @@
 import type { Address } from "viem";
-import { ZERO_ADDRESS } from "./config";
+import { monadTestnet, ZERO_ADDRESS } from "./config";
+import { chogImageFor } from "./chogArt";
 import type { Ecosystem, MetaState, NFTItem, NFTTrait, SwapRecord, SwapStatus, TradeAsset } from "./types";
 
 export type TradeListType = "incoming" | "outgoing" | "history" | "public";
@@ -47,6 +48,7 @@ interface ApiNft {
 }
 
 const TIMEOUT_MS = 5000;
+const TESTNET = monadTestnet.testnet === true;
 
 async function getJson<T>(url: string, timeoutMs = TIMEOUT_MS): Promise<T> {
   const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
@@ -54,13 +56,19 @@ async function getJson<T>(url: string, timeoutMs = TIMEOUT_MS): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/**
+ * On the testnet the "Chog" collection is our own mock, whose on-chain image is a plain placeholder. There we show the
+ * official artwork instead (the original image stays as the fallback). On mainnet the real collection's own images are used.
+ */
+const chogArt = (isChog: boolean, tokenId: string, image: string | null, fallbacks: string[] = []) =>
+  isChog && TESTNET ? { image: chogImageFor(BigInt(tokenId)), imageFallbacks: [...(image ? [image] : []), ...fallbacks] } : { image, imageFallbacks: fallbacks };
+
 const toAsset = (a: ApiAsset): TradeAsset => ({
   contract: a.contract,
   tokenId: BigInt(a.tokenId),
   name: a.name ?? undefined,
   collectionName: a.collectionName ?? undefined,
-  image: a.image,
-  imageFallbacks: a.imageFallbacks ?? [],
+  ...chogArt(a.isChog, a.tokenId, a.image, a.imageFallbacks),
   isChog: a.isChog,
   verified: a.verified,
   ecosystem: a.ecosystem,
@@ -94,8 +102,7 @@ export const toNftItem = (i: ApiNft): NFTItem => ({
   name: i.name,
   description: i.description,
   collectionName: i.collectionName,
-  image: i.image,
-  imageFallbacks: i.imageFallbacks ?? [],
+  ...chogArt(i.isChog, i.tokenId, i.image, i.imageFallbacks),
   isChog: i.isChog,
   verified: i.verified,
   ecosystem: i.ecosystem,
