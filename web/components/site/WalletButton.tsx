@@ -2,7 +2,8 @@
 
 import { Check, ChevronDown, Copy, ExternalLink, LogOut, Wallet } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useAccount, useBalance, useConnect, useDisconnect } from "wagmi";
+import { useBalance, useConnect, useDisconnect } from "wagmi";
+import { useAccount } from "@/lib/useAccount";
 import { monadTestnet } from "@/lib/config";
 import { formatMon, shortAddress } from "@/lib/format";
 

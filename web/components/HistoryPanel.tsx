@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useAccount } from "wagmi";
+import { useAccount } from "@/lib/useAccount";
 import { useTrades } from "@/lib/hooks";
 import { TradeDetailModal } from "./TradeDetailModal";
 import { TradeList } from "./TradeList";

@@ -3,11 +3,13 @@
 import { useMemo, useState } from "react";
 import { AlertCircle, ArrowLeftRight, CheckCircle2, Gift, Globe, ImagePlus, Link2, Loader2, Plus, RefreshCw, Search, UserRound, Users, Wallet } from "lucide-react";
 import { isAddress, type Address } from "viem";
-import { useAccount, useConnect, usePublicClient, useReadContracts, useSwitchChain, useWriteContract } from "wagmi";
+import { useConnect, usePublicClient, useReadContracts, useSwitchChain, useWriteContract } from "wagmi";
+import { useAccount } from "@/lib/useAccount";
 import { erc721Abi, sweeperAbi } from "@/lib/abi";
 import { MAX_ASSETS_PER_SIDE, SWEEPER_ADDRESS, ZERO_ADDRESS, monadTestnet } from "@/lib/config";
 import { formatMon, nftKey, parseMon, sameAddress, shortAddress } from "@/lib/format";
 import { useCollections, useResolvedAddress } from "@/lib/hooks";
+import { confirmTx } from "@/lib/confirm";
 import { useWalletNFTs, type WalletNFTs } from "@/lib/useWalletNFTs";
 import { resolveTokenFromApi, ResolveError } from "@/lib/api";
 import type { NFTItem, SwapOffer } from "@/lib/types";
@@ -172,7 +174,7 @@ export function SwapBuilder() {
           args: [SWEEPER_ADDRESS!, true],
           chainId: monadTestnet.id,
         });
-        await publicClient!.waitForTransactionReceipt({ hash });
+        await confirmTx(publicClient!, hash);
       }
       await approvals.refetch();
     } catch (e) {
@@ -204,7 +206,7 @@ export function SwapBuilder() {
         value: due,
         chainId: monadTestnet.id,
       });
-      await publicClient!.waitForTransactionReceipt({ hash });
+      await confirmTx(publicClient!, hash);
       setCreatedHash(hash);
       mine.clear();
       theirs.clear();
@@ -495,6 +497,7 @@ export function SwapBuilder() {
                 wrongChain={wrongChain}
                 busy={busy}
                 needsApproval={needsApproval}
+                blockApprove={notVerified.length > 0}
                 disabledReason={problem}
                 onApprove={approveAll}
                 onCreate={createSwap}
@@ -603,6 +606,8 @@ function ActionButton(props: {
   wrongChain: boolean;
   busy: null | "approve" | "create";
   needsApproval: boolean;
+  /** Approving a collection the contract will refuse anyway would only cost the user gas. */
+  blockApprove?: boolean;
   disabledReason: string | null;
   onApprove: () => void;
   onCreate: () => void;
@@ -619,7 +624,7 @@ function ActionButton(props: {
     );
   }
   if (props.needsApproval) {
-    return <button className="btn-primary" onClick={props.onApprove}>Approve NFTs</button>;
+    return <button className="btn-primary" onClick={props.onApprove} disabled={props.blockApprove}>Approve NFTs</button>;
   }
   return (
     <button className="btn-primary" onClick={props.onCreate} disabled={!!props.disabledReason}>

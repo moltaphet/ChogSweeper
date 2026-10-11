@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { useAccount } from "wagmi";
+import { useAccount } from "@/lib/useAccount";
 import { useTrades } from "@/lib/hooks";
 import { countUnread, loadSeen, mergeSeen, saveSeen } from "@/lib/unread";
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ArrowDownToLine, ArrowUpFromLine, type LucideIcon } from "lucide-react";
-import { useAccount } from "wagmi";
+import { useAccount } from "@/lib/useAccount";
 import { useTrades } from "@/lib/hooks";
 import type { SwapRecord } from "@/lib/types";
 import { TradeDetailModal } from "./TradeDetailModal";

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeftRight, Clock, Coins, ExternalLink, X } from "lucide-react";
-import { useAccount } from "wagmi";
+import { useAccount } from "@/lib/useAccount";
 import { ZERO_ADDRESS, monadTestnet } from "@/lib/config";
 import { formatMon, nftKey, sameAddress, shortAddress } from "@/lib/format";
 import { expiryLabel } from "@/lib/time";
