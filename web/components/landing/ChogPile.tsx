@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { ChogCard } from "./ChogCard";
+import { MonadLogo } from "@/components/site/MonadLogo";
 
 /** Ids of the Chogs that rain down. The same id always draws the same Chog. */
 const IDS = [
@@ -208,7 +209,7 @@ export function ChogPile() {
         ))}
         {Array.from({ length: COINS }, (_, i) => (
           <div key={`coin${i}`} ref={(el) => { if (el) pieces.current[COIN_AT + i] = Object.assign(pieces.current[COIN_AT + i] ?? { w: 0, h: 0 }, { el }); }} className="absolute left-0 top-0 will-change-transform" style={{ opacity: 0 }}>
-            <div className="flex h-full w-full items-center justify-center rounded-full border-2 border-white/80 bg-gradient-to-br from-[#FFE08A] via-[#F5B544] to-[#D98E1C] font-display text-[10px] font-black text-[#7A4B00] shadow-[0_10px_22px_-8px_rgba(245,181,68,0.85)]">MON</div>
+            <MonadLogo className="h-full w-full" />
           </div>
         ))}
         {LETTERS.map((l, i) => (
