@@ -1,45 +1,44 @@
 "use client";
 
 import { BadgeCheck } from "lucide-react";
-import { useState } from "react";
-import { ChogPortrait, traitsOf } from "./ChogArt";
+import { CHOG_ART, RARITY_LABEL, RARITY_STYLE } from "@/lib/chogArt";
+import { chogArtFor } from "@/lib/chogArt";
 
-/**
- * Optional real artwork. Put the official images in `web/public/chogs/` named `<id>.png` (or .webp) and set
- * NEXT_PUBLIC_CHOG_ART_BASE=/chogs/ (+ NEXT_PUBLIC_CHOG_ART_EXT=png). Any id whose file fails to load falls back to the
- * built-in vector Chog, so a partial set of images is fine.
- */
-const ART_BASE = process.env.NEXT_PUBLIC_CHOG_ART_BASE ?? "";
-const ART_EXT = process.env.NEXT_PUBLIC_CHOG_ART_EXT ?? "png";
-
-export function ChogImage({ id, className = "h-full w-full" }: { id: number; className?: string }) {
-  const [failed, setFailed] = useState(false);
-  if (!ART_BASE || failed) return <ChogPortrait id={id} className={className} />;
+/** The official artwork for a token id (or for catalog slot `slot`, to pick a specific picture). */
+export function ChogImage({ id, slot, className = "h-full w-full" }: { id: number; slot?: number; className?: string }) {
+  const art = slot === undefined ? chogArtFor(id) : CHOG_ART[slot % CHOG_ART.length]!;
   // eslint-disable-next-line @next/next/no-img-element
-  return <img src={`${ART_BASE}${id}.${ART_EXT}`} alt="" className={`${className} object-cover`} onError={() => setFailed(true)} decoding="async" />;
+  return <img src={art.src} alt="" width={560} height={560} className={`${className} object-contain`} decoding="async" draggable={false} />;
 }
 
-/** A trading-card frame around a Chog: glass border, holographic sheen, verified mark and one trait chip. */
-export function ChogCard({ id, className = "", compact }: { id: number; className?: string; compact?: boolean }) {
-  const t = traitsOf(id);
+/**
+ * A Chog trading card: the artwork (it carries its own purple frame) with a drop shadow, a holographic sheen and a label
+ * under it with the name and rarity. `slot` picks a specific picture from the catalog; without it the id decides.
+ */
+export function ChogCard({ id, slot, className = "", compact, dark, bare }: { id: number; slot?: number; className?: string; compact?: boolean; /** Label text for dark backgrounds. */ dark?: boolean; /** Art only, no label. */ bare?: boolean }) {
+  const art = slot === undefined ? chogArtFor(id) : CHOG_ART[slot % CHOG_ART.length]!;
   return (
-    <div className={`group relative rounded-[26px] bg-gradient-to-b from-white/90 to-white/55 p-[7px] shadow-[0_30px_60px_-20px_rgba(20,8,70,0.7),0_0_0_1px_rgba(255,255,255,0.6)_inset] backdrop-blur ${className}`}>
-      <div className="relative aspect-square overflow-hidden rounded-[20px]">
-        <ChogImage id={id} />
+    <div className={`group relative flex flex-col ${className}`}>
+      <div className="relative aspect-square w-full">
+        <ChogImage id={id} slot={slot} className="h-full w-full drop-shadow-[0_22px_26px_rgba(20,8,70,0.45)]" />
         {/* holographic sheen sweeping across the art */}
-        <div className="pointer-events-none absolute inset-0 animate-sheen bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.45)_48%,rgba(255,200,255,0.25)_52%,transparent_65%)] bg-[length:250%_100%] mix-blend-overlay" aria-hidden />
-        <div className="pointer-events-none absolute inset-0 rounded-[20px] ring-1 ring-inset ring-white/50" aria-hidden />
+        <div
+          className="pointer-events-none absolute inset-[7%] animate-sheen rounded-[22%] bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.5)_48%,rgba(255,200,255,0.25)_52%,transparent_65%)] bg-[length:250%_100%] mix-blend-overlay"
+          aria-hidden
+        />
       </div>
-      <div className={`flex items-center justify-between gap-2 px-1.5 ${compact ? "pb-0.5 pt-1.5" : "pb-1 pt-2.5"}`}>
-        <p className={`whitespace-nowrap font-display font-extrabold leading-none text-monad-ink ${compact ? "text-xs" : "text-[15px]"}`}>Chog #{id}</p>
+      {!bare && (
+      <div className={`flex items-center justify-between gap-1.5 ${compact ? "px-1 pt-1" : "px-2 pt-2"}`}>
+        <p className={`whitespace-nowrap font-display font-extrabold leading-none ${dark ? "text-white" : "text-monad-ink"} ${compact ? "text-[11px]" : "text-[15px]"}`}>Chog #{id}</p>
         {compact ? (
           <BadgeCheck className="h-3.5 w-3.5 text-status-active" aria-label="Verified" />
         ) : (
-          <span className="inline-flex min-w-0 items-center gap-1 rounded-full bg-status-activeBg px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-status-activeInk">
-            <BadgeCheck className="h-3 w-3 shrink-0" aria-hidden /> <span className="truncate">{t.hat === "none" ? "Verified" : t.hat}</span>
+          <span className={`inline-flex min-w-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${dark ? "bg-white/15 text-white ring-1 ring-white/30" : RARITY_STYLE[art.rarity]}`}>
+            <BadgeCheck className="h-3 w-3 shrink-0" aria-hidden /> <span className="truncate">{RARITY_LABEL[art.rarity]}</span>
           </span>
         )}
       </div>
+      )}
     </div>
   );
 }

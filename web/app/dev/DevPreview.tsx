@@ -25,7 +25,7 @@ const A = "0x00000000000000000000000000000000000000a1" as const;
 const B = "0x00000000000000000000000000000000000000b2" as const;
 
 const base = { description: null, imageFallbacks: [] as string[], traits: [] as { trait_type: string; value: string }[], meta: "ok" as const };
-const chog = (id: number): NFTItem => ({ ...base, contract: CHOG, tokenId: BigInt(id), name: `Chog #${id}`, collectionName: "Chog", image: art(265, `#${id}`), isChog: true, verified: true, ecosystem: "chog", traits: [{ trait_type: "Hat", value: "Red" }, { trait_type: "Eyes", value: "Laser" }, { trait_type: "Mood", value: "Chill" }] });
+const chog = (id: number): NFTItem => ({ ...base, contract: CHOG, tokenId: BigInt(id), name: `Chog #${id}`, collectionName: "Chog", image: `/chogs/legendary/legendary-0${(id % 8) + 1}.webp`, isChog: true, verified: true, ecosystem: "chog", traits: [{ trait_type: "Hat", value: "Red" }, { trait_type: "Eyes", value: "Laser" }, { trait_type: "Mood", value: "Chill" }] });
 const mon = (id: number): NFTItem => ({ ...base, contract: MON, tokenId: BigInt(id), name: `Molandak #${id}`, collectionName: "Molandak", image: art(150, `#${id}`), isChog: false, verified: true, ecosystem: "monad", traits: [{ trait_type: "Background", value: "Mint" }] });
 const rand = (id: number): NFTItem => ({ ...base, contract: RAND, tokenId: BigInt(id), name: `Lookalike #${id}`, collectionName: "Chogg", image: art(25, `#${id}`), isChog: false, verified: false, ecosystem: null });
 // First gateway is dead (404), the second works: the image must still appear.
