@@ -258,7 +258,7 @@ export function SwapBuilder() {
         <span className="ticket-notch -top-3.5 hidden lg:block" aria-hidden />
 
         {/* ------------------------------ You Give ------------------------------ */}
-        <section className="p-5 sm:p-7" aria-labelledby="give-heading">
+        <section className="min-w-0 p-5 sm:p-7" aria-labelledby="give-heading">
           <header className="mb-4 flex items-start justify-between gap-3">
             <div>
               <p className="eyebrow">Your side</p>
@@ -328,7 +328,7 @@ export function SwapBuilder() {
         </section>
 
         {/* ----------------------------- You Receive ---------------------------- */}
-        <section className="border-t border-monad-border/70 p-5 sm:p-7 lg:border-t-0" aria-labelledby="receive-heading">
+        <section className="min-w-0 border-t border-monad-border/70 p-5 sm:p-7 lg:border-t-0" aria-labelledby="receive-heading">
           <header className="mb-4 flex items-start justify-between gap-3">
             <div>
               <p className="eyebrow">{mode === "direct" ? "Their side" : "Your ask"}</p>

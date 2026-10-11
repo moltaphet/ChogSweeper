@@ -5,7 +5,7 @@ export
 RPC ?= $(if $(MONAD_TESTNET_RPC_URL),$(MONAD_TESTNET_RPC_URL),https://testnet-rpc.monad.xyz/)
 CHAIN_ID ?= 10143
 
-.PHONY: test test-js dry-run deploy export smoke-testnet e2e-local verify-onchain
+.PHONY: test test-js test-ui dry-run deploy export smoke-testnet e2e-local verify-onchain
 
 test:            ## contracts + indexer (if present) + web test suites
 	forge test
@@ -14,6 +14,9 @@ test:            ## contracts + indexer (if present) + web test suites
 
 test-js:         ## contract behaviour tests on an in-process EVM (no Foundry needed): fees, refunds, verified list, tiers
 	cd ops/contract-tests && npm test --silent
+
+test-ui:         ## browser end-to-end on a throw-away local chain with a fake wallet (needs: cd ops/ui-e2e && npm i && npx playwright install chromium)
+	cd ops/ui-e2e && npm test
 
 dry-run:         ## simulate the deployment against the live RPC; sends nothing
 	forge script script/DeployChogSweeper.s.sol --rpc-url $(RPC)

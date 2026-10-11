@@ -64,7 +64,7 @@ export function WalletButton() {
         onClick={() => setOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="flex items-center gap-2 rounded-xl border border-monad-border bg-white/90 py-1.5 pl-1.5 pr-3 text-sm font-semibold shadow-card transition duration-200 hover:border-monad-primary"
+        className="flex items-center gap-1.5 rounded-xl border border-monad-border bg-white/90 py-1.5 pl-1.5 pr-2 text-sm font-semibold shadow-card transition duration-200 hover:border-monad-primary sm:gap-2 sm:pr-3"
       >
         <span className="h-7 w-7 rounded-lg" style={{ background: avatarGradient(address) }} aria-hidden />
         <span className="font-mono text-[13px]">{shortAddress(address)}</span>

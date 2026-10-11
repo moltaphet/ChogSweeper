@@ -33,3 +33,8 @@ next-env.d.ts
 
 # JS contract tests build output
 ops/contract-tests/artifacts.json
+
+# UI end-to-end build output
+ops/ui-e2e/chain.json
+
+ops/ui-e2e/*.log

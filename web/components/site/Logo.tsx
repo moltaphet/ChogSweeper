@@ -22,11 +22,12 @@ export function LogoMark({ className = "h-9 w-9" }: { className?: string }) {
   );
 }
 
-export function Wordmark() {
+/** `iconOnlyOnTiny` drops the name below 400px so a header with a wallet button still fits a 360px phone. */
+export function Wordmark({ iconOnlyOnTiny }: { iconOnlyOnTiny?: boolean }) {
   return (
     <span className="group/logo flex items-center gap-2.5">
       <LogoMark />
-      <span className="font-display text-xl font-extrabold leading-none tracking-tight text-monad-ink">
+      <span className={`font-display text-xl font-extrabold leading-none tracking-tight text-monad-ink ${iconOnlyOnTiny ? "max-[399px]:sr-only" : ""}`}>
         Chog<span className="text-monad-primary">Sweeper</span>
       </span>
     </span>

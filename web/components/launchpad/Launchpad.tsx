@@ -37,7 +37,7 @@ function Workspace() {
 
   return (
     <>
-      <main id="main" className="relative mx-auto max-w-6xl px-4 pb-6 pt-8 sm:pt-10">
+      <main id="main" className="relative mx-auto max-w-6xl overflow-x-clip px-4 pb-6 pt-8 sm:pt-10">
         <div className="mb-5">
           <p className="eyebrow">Launchpad</p>
           <h1 className="h-section mt-1">Everything you need to trade</h1>
