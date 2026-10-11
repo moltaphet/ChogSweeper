@@ -81,7 +81,7 @@ export function Overview() {
               href={LINKS.contract ?? LINKS.explorer}
               target="_blank"
               rel="noreferrer"
-              className="group flex h-full w-full items-start gap-4 rounded-2xl border border-dashed border-monad-border bg-white/50 p-4 text-left transition duration-300 hover:-translate-y-0.5 hover:border-monad-primary/50"
+              className="group flex h-full w-full items-start gap-4 rounded-2xl border border-monad-border bg-white/50 p-4 text-left transition duration-300 hover:-translate-y-0.5 hover:border-monad-primary/50"
             >
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-monad-tint text-monad-deep">
                 <ExternalLink className="h-5 w-5" aria-hidden />
