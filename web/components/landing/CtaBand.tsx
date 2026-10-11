@@ -14,9 +14,9 @@ export function CtaBand() {
         </div>
 
         <div className="mx-auto mb-8 flex max-w-xs items-end justify-center gap-3" aria-hidden>
-          <ChogCard id={21} slot={1} dark compact className="w-24 -rotate-6 sm:w-28" />
-          <ChogCard id={7} slot={2} dark compact className="mb-4 w-28 sm:w-32" />
-          <ChogCard id={42} slot={7} dark compact className="w-24 rotate-6 sm:w-28" />
+          <ChogCard id={21} slot={1} className="w-24 -rotate-6 sm:w-28" />
+          <ChogCard id={7} slot={2} className="mb-4 w-28 sm:w-32" />
+          <ChogCard id={42} slot={7} className="w-24 rotate-6 sm:w-28" />
         </div>
 
         <h2 id="cta-title" className="font-display text-3xl font-extrabold tracking-tight text-white sm:text-5xl">Ready to swap your Chogs?</h2>
