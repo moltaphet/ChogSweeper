@@ -1,10 +1,9 @@
 /**
- * Custom duotone icons for the three steps. A violet stroke carries the shape, a soft lavender fill gives it weight, and a single
- * gold accent marks MON wherever it appears.
+ * Custom duotone icons for the three steps. A violet stroke carries the shape, a soft lavender fill gives it weight, and the Monad logo marks MON wherever it appears.
  */
 const base = { viewBox: "0 0 56 56", fill: "none", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
 
-/** Assemble your bundle: a fan of three NFT cards with a gold MON coin tucked in front. */
+/** Assemble your bundle: a fan of three NFT cards with the Monad logo tucked in front. */
 export function BundleIcon({ className = "h-14 w-14" }: { className?: string }) {
   return (
     <svg {...base} className={className}>
@@ -13,8 +12,7 @@ export function BundleIcon({ className = "h-14 w-14" }: { className?: string }) 
       <circle cx="28" cy="21" r="4.2" fill="#836EF9" />
       <path d="M22 33c2.2-2.6 9.8-2.6 12 0" stroke="#5E43F3" strokeWidth="2" />
       <rect x="27" y="14" width="22" height="30" rx="5" transform="rotate(10 38 29)" fill="#fff" stroke="#836EF9" strokeWidth="2" />
-      <circle cx="40" cy="42" r="8.5" fill="#F5B544" stroke="#fff" strokeWidth="2" />
-      <path d="M36.6 45.2v-6.4l3.4 4 3.4-4v6.4" stroke="#8A5A00" strokeWidth="1.8" />
+      <image href="/monad.png" x="30.5" y="32.5" width="19" height="19" />
     </svg>
   );
 }

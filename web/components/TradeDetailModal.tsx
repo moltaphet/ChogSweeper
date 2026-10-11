@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ArrowLeftRight, Clock, Coins, ExternalLink, X } from "lucide-react";
+import { ArrowLeftRight, Clock, ExternalLink, X } from "lucide-react";
 import { useAccount } from "@/lib/useAccount";
 import { ZERO_ADDRESS, monadTestnet } from "@/lib/config";
 import { formatMon, nftKey, sameAddress, shortAddress } from "@/lib/format";
@@ -14,6 +14,7 @@ import { StatusBadge } from "./StatusBadge";
 import { TradeActions } from "./TradeActions";
 import { VerifiedBadge } from "./VerifiedBadge";
 import { MonTicker } from "@/components/site/MonTicker";
+import { MonadLogo } from "@/components/site/MonadLogo";
 
 const EXPLORER = monadTestnet.blockExplorers.default.url;
 const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -203,7 +204,7 @@ function Side(props: {
           )}
           {props.mon > 0n && (
             <p className="inline-flex items-center gap-1.5 rounded-lg bg-monad-tint px-3 py-1.5 text-sm font-semibold text-monad-deep">
-              <Coins className="h-4 w-4" /> {formatMon(props.mon)} <MonTicker />
+              <MonadLogo className="h-4 w-4" /> {formatMon(props.mon)} <MonTicker />
             </p>
           )}
         </div>
