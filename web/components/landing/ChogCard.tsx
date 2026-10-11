@@ -13,7 +13,7 @@ export function ChogImage({ id, slot, className = "h-full w-full" }: { id: numbe
 
 /**
  * A Chog trading card: the artwork (it carries its own purple frame) with a drop shadow, a holographic sheen and a label
- * under it with the name and rarity. `slot` picks a specific picture from the catalog; without it the id decides.
+ * under it with its rarity chip (no id). `slot` picks a specific picture from the catalog; without it the id decides.
  */
 export function ChogCard({ id, slot, className = "", compact, dark, bare }: { id: number; slot?: number; className?: string; compact?: boolean; /** Label text for dark backgrounds. */ dark?: boolean; /** Art only, no label. */ bare?: boolean }) {
   const art = slot === undefined ? chogArtFor(id) : CHOG_ART[slot % CHOG_ART.length]!;
@@ -28,16 +28,11 @@ export function ChogCard({ id, slot, className = "", compact, dark, bare }: { id
         />
       </div>
       {!bare && (
-      <div className={`flex items-center justify-between gap-1.5 ${compact ? "px-1 pt-1" : "px-2 pt-2"}`}>
-        <p className={`whitespace-nowrap font-display font-extrabold leading-none ${dark ? "text-white" : "text-monad-ink"} ${compact ? "text-[11px]" : "text-[15px]"}`}>Chog #{id}</p>
-        {compact ? (
-          <BadgeCheck className="h-3.5 w-3.5 text-status-active" aria-label="Verified" />
-        ) : (
-          <span className={`inline-flex min-w-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${dark ? "bg-white/15 text-white ring-1 ring-white/30" : RARITY_STYLE[art.rarity]}`}>
-            <BadgeCheck className="h-3 w-3 shrink-0" aria-hidden /> <span className="truncate">{RARITY_LABEL[art.rarity]}</span>
+        <div className={`flex items-center justify-center ${compact ? "pt-1" : "pt-2"}`}>
+          <span className={`inline-flex items-center gap-1 rounded-full font-bold uppercase tracking-wide ${compact ? "px-1.5 py-0.5 text-[9px]" : "px-2.5 py-0.5 text-[10px]"} ${dark ? "bg-white/15 text-white ring-1 ring-white/30" : RARITY_STYLE[art.rarity]}`}>
+            <BadgeCheck className={`shrink-0 ${compact ? "h-2.5 w-2.5" : "h-3 w-3"}`} aria-hidden /> {RARITY_LABEL[art.rarity]}
           </span>
-        )}
-      </div>
+        </div>
       )}
     </div>
   );
