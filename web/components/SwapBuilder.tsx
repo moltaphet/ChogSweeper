@@ -19,6 +19,7 @@ import { AddTokenForm } from "./AddTokenForm";
 import { EmptyState } from "./EmptyState";
 import { useHub, type OfferMode } from "./HubContext";
 import { NFTSelectorGrid } from "./NFTSelectorGrid";
+import { MonTicker } from "@/components/site/MonTicker";
 
 const EXPIRY_OPTIONS = [
   { label: "1 hour", seconds: 3600 },
@@ -475,13 +476,13 @@ export function SwapBuilder() {
               </label>
               <span title="Paid by you when the swap is created, refunded in full if it is cancelled or declined, kept only when it is accepted. Zero for Chog holders and during promotions.">
                 Platform fee:{" "}
-                <strong className="text-monad-ink">{feeWei === null ? "…" : feeWei === 0n ? "Free" : `${formatMon(feeWei, 6)} MON`}</strong>
+                <strong className="text-monad-ink">{feeWei === null ? "…" : feeWei === 0n ? "Free" : <>{formatMon(feeWei, 6)} <MonTicker /></>}</strong>
                 {feeWei !== null && feeWei > 0n && <span className="text-monad-muted"> (refunded if rejected)</span>}
               </span>
               <span title="Monad charges for the gas limit, so this is the amount reserved at the current gas price.">
                 Est. gas:{" "}
                 <strong className="text-monad-ink">
-                  {gas.data ? `${gas.data.units.toLocaleString()} (~${formatMon(gas.data.cost, 6)} MON)` : needsApproval ? "after approval" : "—"}
+                  {gas.data ? <>{gas.data.units.toLocaleString()} (~{formatMon(gas.data.cost, 6)} <MonTicker />)</> : needsApproval ? "after approval" : "—"}
                 </strong>
               </span>
             </div>
@@ -580,7 +581,7 @@ function MonField({ label, value, onChange, invalid }: { label: string; value: s
           onChange={(e) => onChange(e.target.value)}
           aria-invalid={invalid}
         />
-        <span className="pointer-events-none absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5 text-xs font-bold text-coin-ink"><span className="flex h-4 w-4 items-center justify-center rounded-full bg-coin text-[9px] font-black text-white" aria-hidden>M</span>MON</span>
+        <span className="pointer-events-none absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5 text-xs font-bold text-coin-ink"><MonTicker className="h-4" /></span>
       </div>
     </div>
   );

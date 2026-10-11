@@ -8,6 +8,7 @@ import { timeAgo } from "@/lib/time";
 import { EmptyState } from "../EmptyState";
 import { NftImage } from "../NftImage";
 import { VerifiedBadge } from "../VerifiedBadge";
+import { MonTicker } from "@/components/site/MonTicker";
 
 const DOT: Record<ActivityItem["status"], { cls: string; label: string }> = {
   completed: { cls: "bg-status-active", label: "Completed" },
@@ -51,7 +52,7 @@ export function ActivitySection() {
                 <dt className="text-xs font-medium text-monad-muted">{x.label}</dt>
                 <dd className={`mt-1 font-display text-2xl font-extrabold tracking-tight ${isLoading ? "animate-pulse text-monad-border" : "text-monad-ink"}`}>
                   {x.value}
-                  {x.coin && !isLoading && <span className="ml-1 text-sm font-bold text-coin-ink">MON</span>}
+                  {x.coin && !isLoading && <MonTicker className="ml-1.5 h-5" />}
                 </dd>
               </div>
             ))}
@@ -76,7 +77,7 @@ export function ActivitySection() {
                     </p>
                     <p className="truncate text-xs text-monad-muted">
                       {a.assetCount} NFT{a.assetCount === 1 ? "" : "s"}
-                      {BigInt(a.monWei) > 0n && <> + <span className="font-semibold text-coin-ink">{formatMon(BigInt(a.monWei), 3)} MON</span></>}
+                      {BigInt(a.monWei) > 0n && <> + <span className="font-semibold text-coin-ink">{formatMon(BigInt(a.monWei), 3)} <MonTicker /></span></>}
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
