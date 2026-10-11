@@ -20,15 +20,8 @@ const SPARKS = Array.from({ length: 22 }, (_, i) => ({
   delay: (i % 7) * 0.5,
 }));
 
-/** MON coins on three orbits around the centre card. */
-const COINS = [
-  { size: 52, orbit: 250, dur: 22, start: 0, rev: false },
-  { size: 38, orbit: 320, dur: 30, start: 140, rev: true },
-  { size: 30, orbit: 190, dur: 17, start: 250, rev: false },
-] as const;
-
 /**
- * The hero's right half: a fan of holographic Chog cards floating over a spinning swap portal, with orbiting MON coins,
+ * The hero's right half: a fan of holographic Chog cards floating over a spinning swap portal, with
  * twinkling sparks and a perspective grid floor. Pointer movement tilts the whole scene a little and moves each card by its depth.
  */
 export function HeroScene() {
@@ -65,7 +58,7 @@ export function HeroScene() {
       className="relative mx-auto h-[420px] w-full max-w-[640px] select-none [--k:0.72] sm:h-[540px] sm:[--k:0.9] lg:h-[600px] lg:[--k:1]"
       style={{ perspective: "1400px", ["--mx" as string]: 0, ["--my" as string]: 0 }}
       role="img"
-      aria-label="Illustration: a fan of Chog NFTs floating above a swap portal while MON coins orbit them"
+      aria-label="Illustration: a fan of Chog NFTs floating above a swap portal"
     >
       {/* portal */}
       <div className="absolute left-1/2 top-[52%] aspect-square w-[88%] -translate-x-1/2 -translate-y-1/2" aria-hidden>
@@ -74,18 +67,6 @@ export function HeroScene() {
         <div className="absolute inset-[18%] rounded-full bg-[radial-gradient(closest-side,rgba(168,139,250,0.55),rgba(91,33,182,0.25)_55%,transparent)] blur-xl" />
         <div className="absolute inset-[3%] rounded-full border border-dashed border-white/15" />
       </div>
-
-      {/* orbiting MON coins */}
-      {COINS.map((c) => (
-        <div key={c.orbit} className="pointer-events-none absolute left-1/2 top-[52%]" style={{ width: 0, height: 0 }} aria-hidden>
-          <div className="absolute animate-spin-slow" style={{ width: 0, height: 0, animationDuration: `${c.dur}s`, animationDirection: c.rev ? "reverse" : "normal", transform: `rotate(${c.start}deg)` }}>
-            <div className="absolute rounded-full border-2 border-white/80 bg-gradient-to-br from-[#FFE08A] via-[#F5B544] to-[#D98E1C] shadow-[0_10px_26px_-6px_rgba(245,181,68,0.85)]" style={{ width: c.size, height: c.size, left: `calc(${c.orbit * 0.8}px * var(--k) - ${c.size / 2}px)`, top: -c.size / 2 }}>
-              {/* counter-rotate so the label always reads upright while the coin circles */}
-              <span className="flex h-full w-full animate-spin-slow items-center justify-center font-display font-black text-[#7A4B00]" style={{ fontSize: c.size * 0.26, animationDuration: `${c.dur}s`, animationDirection: c.rev ? "normal" : "reverse", animationDelay: `-${((c.rev ? 360 - c.start : c.start) / 360) * c.dur}s` }}>MON</span>
-            </div>
-          </div>
-        </div>
-      ))}
 
       {/* sparks */}
       {SPARKS.map((s, i) => (
