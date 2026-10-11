@@ -30,7 +30,7 @@ export function NFTSelectorGrid({ items, selected, onToggle, max, loading, disab
   if (items.length === 0) {
     if (emptyContent) return <>{emptyContent}</>;
     return (
-      <div className="flex h-40 items-center justify-center rounded-xl border border-dashed border-monad-border px-6 text-center text-sm text-monad-muted">
+      <div className="flex h-40 items-center justify-center rounded-xl border border-monad-border px-6 text-center text-sm text-monad-muted">
         {emptyMessage}
       </div>
     );

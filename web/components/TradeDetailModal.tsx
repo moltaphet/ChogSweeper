@@ -190,7 +190,7 @@ function Side(props: {
       </p>
 
       {empty ? (
-        <p className="rounded-xl border border-dashed border-monad-border px-3 py-6 text-center text-xs text-monad-muted">
+        <p className="rounded-xl border border-monad-border px-3 py-6 text-center text-xs text-monad-muted">
           {props.emptyLabel ?? "Nothing"}
         </p>
       ) : (

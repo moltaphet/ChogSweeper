@@ -17,15 +17,13 @@ interface Props {
 }
 
 /**
- * An empty box is an invitation: a small stack of dashed "ghost cards", one sentence saying what belongs here,
+ * An empty box is an invitation: an icon tile, one sentence saying what belongs here,
  * and the next step as a button.
  */
 export function EmptyState({ icon: Icon, title, body, action, secondary, compact }: Props) {
   return (
-    <div className={`flex flex-col items-center justify-center rounded-2xl border border-dashed border-monad-border bg-gradient-to-b from-monad-tint/50 to-white px-6 text-center ${compact ? "py-7" : "py-10"}`}>
+    <div className={`flex flex-col items-center justify-center rounded-2xl border border-monad-border bg-gradient-to-b from-monad-tint/50 to-white px-6 text-center ${compact ? "py-7" : "py-10"}`}>
       <div className={`relative mb-4 ${compact ? "h-16 w-20" : "h-20 w-24"}`} aria-hidden>
-        <span className="absolute inset-x-3 inset-y-0 -rotate-[9deg] rounded-2xl border-2 border-dashed border-monad-border bg-white/70" />
-        <span className="absolute inset-x-3 inset-y-0 rotate-[7deg] rounded-2xl border-2 border-dashed border-monad-primary/40 bg-monad-tint/80" />
         <span className="absolute inset-x-3 inset-y-0 flex items-center justify-center rounded-2xl border border-monad-border bg-white shadow-card">
           <Icon className="h-7 w-7 text-monad-primary" strokeWidth={1.75} />
         </span>
