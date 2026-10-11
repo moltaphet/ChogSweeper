@@ -12,7 +12,7 @@ export function ChogImage({ id, slot, className = "h-full w-full" }: { id: numbe
 }
 
 /**
- * A Chog trading card: the artwork (it carries its own purple frame) with a drop shadow, a holographic sheen and a label
+ * A Chog trading card: the artwork (it carries its own purple frame) with no shadow or border box around it, a holographic sheen and a label
  * under it with its rarity chip (no id). `slot` picks a specific picture from the catalog; without it the id decides.
  */
 export function ChogCard({ id, slot, className = "", compact, dark, bare }: { id: number; slot?: number; className?: string; compact?: boolean; /** Label text for dark backgrounds. */ dark?: boolean; /** Art only, no label. */ bare?: boolean }) {
@@ -20,7 +20,7 @@ export function ChogCard({ id, slot, className = "", compact, dark, bare }: { id
   return (
     <div className={`group relative flex flex-col ${className}`}>
       <div className="relative aspect-square w-full">
-        <ChogImage id={id} slot={slot} className="h-full w-full drop-shadow-[0_22px_26px_rgba(20,8,70,0.45)]" />
+        <ChogImage id={id} slot={slot} className="h-full w-full" />
         {/* holographic sheen sweeping across the art */}
         <div
           className="pointer-events-none absolute inset-[7%] animate-sheen rounded-[22%] bg-[linear-gradient(115deg,transparent_35%,rgba(255,255,255,0.5)_48%,rgba(255,200,255,0.25)_52%,transparent_65%)] bg-[length:250%_100%] mix-blend-overlay"
