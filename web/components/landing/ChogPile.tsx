@@ -60,7 +60,7 @@ export function ChogPile() {
         // Big, chunky pieces: a real heap about two to three cards deep, so they land on top of each other, with the whole height above it left clear for the fall.
         const cardW = Math.max(112, Math.min(216, W / 6.8));
         const perRow = W / cardW;
-        const count = Math.max(9, Math.min(IDS.length, Math.round(perRow * 2.6)));
+        const count = Math.max(9, Math.min(IDS.length, Math.round(perRow * 2.1)));
 
         const engine = Engine.create({ gravity: { x: 0, y: 2.1 }, enableSleeping: true });
         engine.timing.timeScale = 1.5; // snappier: the fall reads as rain, not slow motion
@@ -78,6 +78,8 @@ export function ChogPile() {
           const kind = i >= LETTER_AT ? "letter" : i >= COIN_AT ? "coin" : "card";
           const w = kind === "card" ? cardW : kind === "coin" ? cardW * 0.4 : cardW * 0.46;
           const h = kind === "card" ? cardW : w;
+          // The artwork has transparent margin (and a thick lower edge), so a card's hit box is a little smaller than its picture: the frames then touch instead of floating apart.
+          const hit = kind === "card" ? 0.88 : 1;
           p.w = w;
           p.h = h;
           p.el.style.width = `${w}px`;
@@ -85,7 +87,7 @@ export function ChogPile() {
           const body =
             kind === "coin"
               ? Bodies.circle(0, 0, w / 2, { restitution: 0.6, friction: 0.2, density: 0.0012 })
-              : Bodies.rectangle(0, 0, w, h, { chamfer: { radius: kind === "letter" ? 10 : 14 }, restitution: 0.32, friction: 0.45, frictionAir: 0.006, density: 0.001 });
+              : Bodies.rectangle(0, 0, w * hit, h * hit, { chamfer: { radius: kind === "letter" ? 10 : 7 }, restitution: 0.32, friction: 0.45, frictionAir: 0.006, density: 0.001 });
           p.body = body;
           // Rain: each piece starts at its own spot across the whole width, well above the top edge so the fall is long, and ...
           Body.setPosition(body, { x: w * 0.6 + Math.random() * (W - w * 1.2), y: -h * (0.8 + Math.random() * 3.2) });
