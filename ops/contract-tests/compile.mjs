@@ -10,6 +10,7 @@ const sources = {};
 const add = (name, file) => (sources[name] = { content: fs.readFileSync(file, "utf8") });
 add("src/ChogSweeper.sol", `${ROOT}/src/ChogSweeper.sol`);
 add("src/MockChog.sol", `${ROOT}/src/MockChog.sol`);
+add("src/MockCollection.sol", `${ROOT}/src/MockCollection.sol`);
 add("helpers/JsMocks.sol", path.join(HERE, "helpers/JsMocks.sol"));
 const input = { language: "Solidity", sources, settings: { optimizer: { enabled: true, runs: 1000 }, evmVersion: "shanghai", outputSelection: { "*": { "*": ["abi", "evm.bytecode.object"] } } } };
 const findImports = (p) => {
@@ -24,4 +25,4 @@ if (process.exitCode) process.exit(1);
 const art = {};
 for (const [file, cs] of Object.entries(out.contracts)) for (const [n, c] of Object.entries(cs)) art[n] = { abi: c.abi, bytecode: "0x" + c.evm.bytecode.object };
 fs.writeFileSync("artifacts.json", JSON.stringify(art));
-console.log("compiled:", Object.keys(art).filter((n) => ["ChogSweeper", "MockChog", "MockNFT"].includes(n)).join(", "));
+console.log("compiled:", Object.keys(art).filter((n) => ["ChogSweeper", "MockChog", "MockCollection", "MockNFT"].includes(n)).join(", "));

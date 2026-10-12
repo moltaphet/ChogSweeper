@@ -351,3 +351,26 @@ test("getTrade exposes the fee; unknown ids; ownership is two-step", async () =>
   assert.equal(await read(S, "ChogSweeper", "owner"), addr(alice));
   await sw(alice, "transferOwnership", [addr(owner)]); await sw(owner, "acceptOwnership", []);
 });
+
+test("MockCollection: batch mint, on-chain metadata, tradable once verified, and a cross-collection swap", async () => {
+  const MC = await deploy("MockCollection", owner, ["Mock Molandak", "MMOLA", 150n]);
+  await call(owner, MC, "MockCollection", "mintBatch", [addr(alice), 5n]);
+  assert.equal(await read(MC, "MockCollection", "balanceOf", [addr(alice)]), 5n);
+  await reverts(call(owner, MC, "MockCollection", "mintBatch", [addr(alice), 11n]), /InvalidBatchSize|revert/);
+  const uri = await read(MC, "MockCollection", "tokenURI", [3n]);
+  const meta = JSON.parse(Buffer.from(uri.replace("data:application/json;base64,", ""), "base64").toString());
+  assert.equal(meta.name, "Mock Molandak #3");
+  assert.match(meta.image, /^data:image\/svg\+xml;base64,/);
+
+  // not verified yet: the contract refuses it
+  await call(alice, MC, "MockCollection", "setApprovalForAll", [S, true]);
+  const b = fresh(); await mint(NFT2, addr(bob), b);
+  await reverts(create(alice, { taker: addr(bob), offered: [asset(MC, 1)], wanted: [asset(NFT2, b)] }), /UnverifiedCollection|revert/);
+
+  await sw(owner, "setVerifiedCollections", [[MC], true]);
+  await create(alice, { taker: addr(bob), offered: [asset(MC, 1)], wanted: [asset(NFT2, b)] });
+  const tid = await read(S, "ChogSweeper", "tradeCount");
+  await sw(bob, "acceptSwap", [tid], 0n);
+  assert.equal(await read(MC, "MockCollection", "ownerOf", [1n]), addr(bob));
+  assert.equal(await ownerOf(NFT2, b), addr(alice));
+});

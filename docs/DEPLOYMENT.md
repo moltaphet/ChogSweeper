@@ -129,6 +129,15 @@ make e2e-local
 
 Starts anvil (chain id 10143), deploys with the real script, starts Postgres, the indexer and the API, runs the smoke test, then tears everything down. Logs: `.e2e/logs/`. Add `--keep` (`cd ops && node e2e-local.mjs --keep`) to leave the stack running.
 
+## 7b. More collections to test with (testnet only)
+
+```bash
+# SEED_MINT_TO = the wallet(s) that should receive tokens (comma separated); SEED_MINT_COUNT per collection, default 5
+SEED_MINT_TO=0xYourWallet make test-collections
+```
+
+Deploys four mock partner collections (`MockCollection`: Mock Molandak, Mock Moyaki, Mock Chewy, Mock Mop), mints tokens to `SEED_MINT_TO`, verifies them on the deployed ChogSweeper (the key must be its owner), adds them to `config/verified-collections.json` and re-runs the export. Restart the web app afterwards and, on Vercel, update `NEXT_PUBLIC_COLLECTIONS` from `web/.env.local`.
+
 ## 8. Operating notes
 
 * **Change the fee:** owner calls `setPlatformFee(uint128)`. Promotion: `setFeeWaivedUntil(unixTime)`. Capped at 10 MON. Existing trades keep the fee they paid.
