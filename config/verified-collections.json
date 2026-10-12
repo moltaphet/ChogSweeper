@@ -1,7 +1,32 @@
 {
   "_comment": "Seed list of verified collections per chain id. ecosystem is 'chog' or 'monad'. startBlock is the collection's deploy block (history before it is not scanned). `ops/export-deployment.mjs` turns this, plus the MockChog it deployed, into VERIFIED_COLLECTIONS (web) and COLLECTIONS (indexer). Add the official Chog and partner collections here once their testnet addresses are confirmed.",
   "chains": {
-    "10143": [],
+    "10143": [
+      {
+        "address": "0x786bd6B0a35c5053877D66cdDe88A6b2338EC69c",
+        "ecosystem": "monad",
+        "startBlock": 70502856,
+        "name": "Mock Molandak"
+      },
+      {
+        "address": "0x1f7d461268e5568D09eAe9182429c3F0644E4382",
+        "ecosystem": "monad",
+        "startBlock": 70502856,
+        "name": "Mock Moyaki"
+      },
+      {
+        "address": "0x34eD3457B063057742a64e83D3a58fC75eF9e12a",
+        "ecosystem": "monad",
+        "startBlock": 70502856,
+        "name": "Mock Chewy"
+      },
+      {
+        "address": "0x422CC82C81551bebED18Ce2B7204113F1401A386",
+        "ecosystem": "monad",
+        "startBlock": 70502857,
+        "name": "Mock Mop"
+      }
+    ],
     "143": []
   }
 }
