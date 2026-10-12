@@ -5,7 +5,7 @@ export
 RPC ?= $(if $(MONAD_TESTNET_RPC_URL),$(MONAD_TESTNET_RPC_URL),https://testnet-rpc.monad.xyz/)
 CHAIN_ID ?= 10143
 
-.PHONY: test test-js test-ui dry-run deploy export smoke-testnet e2e-local verify-onchain
+.PHONY: test test-js test-ui dry-run deploy export test-collections smoke-testnet e2e-local verify-onchain
 
 test:            ## contracts + indexer (if present) + web test suites
 	forge test
@@ -26,6 +26,12 @@ deploy:          ## broadcast to Monad Testnet, then export addresses / ABIs / e
 	node ops/export-deployment.mjs --chain-id $(CHAIN_ID) --rpc $(RPC)
 
 export:          ## re-run only the export (e.g. after a slow confirmation)
+	node ops/export-deployment.mjs --chain-id $(CHAIN_ID) --rpc $(RPC)
+
+test-collections: ## testnet only: deploy 4 mock partner collections, mint some to SEED_MINT_TO, verify them on-chain and in the config
+	@test -f deployments/$(CHAIN_ID).json || { echo "No deployments/$(CHAIN_ID).json yet: run 'make deploy' first."; exit 1; }
+	SWEEPER_ADDRESS=$$(node -p "require('./deployments/$(CHAIN_ID).json').sweeper.address") forge script script/DeployTestCollections.s.sol --rpc-url $(RPC) --broadcast
+	node ops/add-test-collections.mjs --chain-id $(CHAIN_ID)
 	node ops/export-deployment.mjs --chain-id $(CHAIN_ID) --rpc $(RPC)
 
 verify-onchain:  ## read the deployed configuration straight from the chain
