@@ -1,7 +1,10 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { usePublicClient } from "wagmi";
 import { fetchTradesFromApi } from "./api";
+import { readRecentTrades } from "./chainTrades";
+import { SWEEPER_ADDRESS, ZERO_ADDRESS, monadTestnet } from "./config";
 import type { SwapRecord } from "./types";
 
 export interface ActivityItem {
@@ -38,9 +41,23 @@ const json = async <T,>(url: string): Promise<T> => {
 export const useStats = () =>
   useQuery({ queryKey: ["site-stats"], queryFn: () => json<SiteStats>("/api/stats"), refetchInterval: 20_000, retry: 1, staleTime: 10_000 });
 
-/** Open Counter offers anyone can accept. */
-export const usePublicOffers = () =>
-  useQuery<SwapRecord[]>({ queryKey: ["public-offers"], queryFn: () => fetchTradesFromApi(undefined, "public"), refetchInterval: 15_000, retry: 1 });
+/** Open Counter offers anyone can accept. Indexer API first; without it, the newest still-open public trades read from the contract. */
+export function usePublicOffers() {
+  const client = usePublicClient({ chainId: monadTestnet.id });
+  return useQuery<SwapRecord[]>({
+    queryKey: ["public-offers"],
+    refetchInterval: 15_000,
+    retry: 1,
+    queryFn: async () => {
+      try {
+        return await fetchTradesFromApi(undefined, "public");
+      } catch (e) {
+        if (!SWEEPER_ADDRESS || !client) throw e;
+        return (await readRecentTrades(client)).filter((t) => t.status === "pending" && t.taker === ZERO_ADDRESS);
+      }
+    },
+  });
+}
 
 export interface VerifiedCollection {
   address: string;

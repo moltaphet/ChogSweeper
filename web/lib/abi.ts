@@ -35,6 +35,7 @@ export const sweeperAbi = [
     inputs: [{ name: "maker", type: "address" }],
     outputs: [{ type: "uint256" }],
   },
+  { type: "function", name: "tradeCount", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
   {
     type: "function",
     name: "isVerified",

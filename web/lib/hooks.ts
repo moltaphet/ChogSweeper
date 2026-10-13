@@ -5,13 +5,12 @@ import { useQuery } from "@tanstack/react-query";
 import { createPublicClient, http, isAddress, type Address, type PublicClient } from "viem";
 import { mainnet } from "viem/chains";
 import { normalize } from "viem/ens";
-import { getLogsChunked } from "./chainLogs";
+import { readRecentTrades } from "./chainTrades";
 import { usePublicClient } from "wagmi";
-import { sweeperAbi } from "./abi";
 import { CHOG_COLLECTION, DEFAULT_COLLECTIONS, DEPLOY_BLOCK, SWEEPER_ADDRESS, ZERO_ADDRESS, monadTestnet } from "./config";
 import { fetchTradesFromApi } from "./api";
 import { partitionTrades, type TradeLists } from "./trades";
-import type { SwapRecord, SwapStatus } from "./types";
+import type { SwapRecord } from "./types";
 
 const STORAGE_KEY = "chogsweeper:collections";
 
@@ -81,51 +80,14 @@ export function useResolvedAddress(input: string): Resolution {
   return q.data ? { state: "ok", address: q.data, fromName: value } : { state: "invalid" };
 }
 
-// Contract enum: 0 None, 1 Active, 2 Accepted, 3 Cancelled, 4 Declined.
-// Contract enum: 0 None, 1 Active, 2 Accepted, 3 Cancelled, 4 Declined.
-const STATUS_BY_INDEX: Record<number, SwapStatus | undefined> = { 1: "pending", 2: "completed", 3: "cancelled", 4: "declined" };
-
-/** Fallback when the indexer is unreachable: rebuild the user's trades from contract logs. */
+/**
+ * Fallback when the indexer is unreachable: read the newest trades straight from the contract (no log scanning, so it stays
+ * fast however old the deployment is) and keep the ones this user is part of.
+ */
 async function fetchTradesFromChain(client: PublicClient, user: Address): Promise<SwapRecord[]> {
-  const event = sweeperAbi.find((x) => x.type === "event" && x.name === "TradeCreated")!;
-  const [asMaker, asTaker] = await Promise.all(
-    [{ maker: user }, { taker: user }].map((args) =>
-      getLogsChunked(client, (fromBlock, toBlock) => client.getLogs({ address: SWEEPER_ADDRESS!, event, args, fromBlock, toBlock }), DEPLOY_BLOCK),
-    ),
-  );
-  type Created = { id: bigint; block: bigint; args: (typeof asMaker)[number]["args"] };
-  const seen = new Map<string, Created>();
-  for (const l of [...asMaker, ...asTaker]) {
-    const id = l.args.tradeId as bigint;
-    seen.set(id.toString(), { id, block: l.blockNumber, args: l.args });
-  }
-  const entries = [...seen.values()];
-  if (entries.length === 0) return [];
-
-  // Assets come from the creation event (the contract clears them on settlement); only status needs a read.
-  const results = await client.multicall({
-    allowFailure: false,
-    contracts: entries.map((e) => ({ address: SWEEPER_ADDRESS!, abi: sweeperAbi, functionName: "getTrade" as const, args: [e.id] as const })),
-  });
-  const now = Math.floor(Date.now() / 1000);
-  return results.map((r, i): SwapRecord => {
-    const e = entries[i]!;
-    const expiry = Number(e.args.expiry);
-    let status = STATUS_BY_INDEX[r[2]] ?? "cancelled";
-    if (status === "pending" && expiry < now) status = "expired";
-    return {
-      id: e.id,
-      createdBlock: e.block,
-      maker: e.args.maker as Address,
-      taker: (e.args.taker as Address | undefined) ?? ZERO_ADDRESS,
-      status,
-      expiry,
-      offeredMon: e.args.offeredMon as bigint,
-      wantedMon: e.args.wantedMon as bigint,
-      offered: (e.args.offered ?? []).map((a) => ({ contract: a.nft, tokenId: a.tokenId })),
-      wanted: (e.args.wanted ?? []).map((a) => ({ contract: a.nft, tokenId: a.tokenId })),
-    };
-  });
+  const all = await readRecentTrades(client);
+  const me = user.toLowerCase();
+  return all.filter((t) => t.maker.toLowerCase() === me || t.taker.toLowerCase() === me);
 }
 
 export type TradesResult = TradeLists & { source: "indexer" | "chain" };
