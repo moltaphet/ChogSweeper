@@ -14,7 +14,6 @@ Peer-to-peer NFT and MON swaps on Monad: escrow contract, indexer, API and trade
 | `web/` | Next.js app and API routes |
 | `shared/` | `nft-resolver.ts`, the canonical metadata resolver (a copy lives in `web/lib/server/`) |
 | `ops/` | deployment exporter, smoke test, local full-stack runner, `contract-tests/` (Foundry-free contract tests), `ui-e2e/` (browser tests) |
-| `prisma/` | Prisma model of the indexer database |
 | `config/` | verified-collection seed list per chain |
 
 ## How a swap works
