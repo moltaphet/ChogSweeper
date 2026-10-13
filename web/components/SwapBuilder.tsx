@@ -441,7 +441,7 @@ export function SwapBuilder() {
       <div className={`z-20 mx-3 mb-3 mt-5 rounded-2xl border border-white/80 bg-white/90 p-4 shadow-lift backdrop-blur-xl sm:mx-5 sm:mb-5 ${hasDraft ? "sticky bottom-3" : ""}`}>
         <div className="space-y-3">
           <div className="grid items-center gap-3 md:grid-cols-[1fr_auto_1fr]">
-            <AssetSummaryCard title="You give" nfts={giveItems} monWei={giveWei ?? 0n} compact onRemoveNft={(n) => { const item = giveItems.find((i) => nftKey(i) === nftKey(n)); if (item) mine.toggle(item); }} onClearMon={() => setGiveMon("")} />
+            <AssetSummaryCard title="You give" nfts={giveItems} monWei={giveWei ?? 0n} compact />
             <ArrowLeftRight className="mx-auto hidden h-5 w-5 text-monad-primary md:block" aria-hidden />
             <AssetSummaryCard
               title="You receive"
@@ -449,8 +449,6 @@ export function SwapBuilder() {
               monWei={wantWei ?? 0n}
               subtitle={mode === "direct" ? (targetAddress ? shortAddress(targetAddress) : undefined) : "Open to anyone"}
               compact
-              onRemoveNft={(n) => { const item = wantItems.find((i) => nftKey(i) === nftKey(n)); if (item) theirs.toggle(item); }}
-              onClearMon={() => setWantMon("")}
             />
           </div>
 
