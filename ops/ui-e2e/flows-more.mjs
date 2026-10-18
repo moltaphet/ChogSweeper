@@ -143,6 +143,22 @@ console.log("\n== Flow 6: an expired offer shows a Reclaim button and returns th
   check((await ownerOf(picked)) === A.toLowerCase(), `Chog #${picked} is back with A`);
 }
 
+console.log("\n== Flow 7: the Test faucet tab mints free test NFTs from the website ==");
+{
+  const owned = (who) => call(CH, encodeFunctionData({ abi: art.MockChog.abi, functionName: "balanceOf", args: [who] })).then((d) => Number(decodeFunctionResult({ abi: art.MockChog.abi, functionName: "balanceOf", data: d })));
+  const page = await open(4, "/launchpad?tab=faucet");
+  await page.getByRole("button", { name: /Connect wallet/i }).first().click();
+  await page.getByRole("button", { name: /Mint 5/ }).first().waitFor({ timeout: 30000 }).catch(() => {});
+  const before = await owned(C);
+  check(await page.getByRole("link", { name: /Open the Monad faucet/ }).isVisible().catch(() => false), "the tab links to the MON faucet");
+  const mintBtn = page.getByRole("button", { name: /Mint 5/ }).first();
+  check(await mintBtn.isEnabled().catch(() => false), "a Mint button is offered for the test collection");
+  await mintBtn.click().catch(() => {});
+  for (let i = 0; i < 40 && (await owned(C)) === before; i++) await sleep(500);
+  check((await owned(C)) === before + 5, "minting from the page gives the wallet 5 test NFTs", `${before} -> ${await owned(C)}`);
+  await shot(page, "f7_faucet");
+}
+
 for (const l of allLogs) for (const m of l) if (!/503|Failed to load resource|stats/.test(m)) console.log("  ! browser:", m.slice(0, 220));
 await b.close();
 const failed = results.filter((r) => !r.ok);
