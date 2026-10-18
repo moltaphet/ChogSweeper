@@ -3,7 +3,7 @@
  * Launchpad view is open (and whether a new trade is Direct or Public) is URL state, so links like `/launchpad?tab=requests`
  * work from anywhere and a page reload or a shared link lands on the same view. `/swap` is kept as a redirect to it.
  */
-export type SwapTab = "overview" | "new" | "requests" | "history" | "public" | "collections" | "activity" | "lookup";
+export type SwapTab = "overview" | "new" | "requests" | "history" | "public" | "collections" | "activity" | "lookup" | "faucet";
 export type TradeMode = "direct" | "open";
 
 export const LAUNCHPAD_PATH = "/launchpad";
@@ -11,7 +11,7 @@ export const LAUNCHPAD_PATH = "/launchpad";
 export const SWAP_PATH = LAUNCHPAD_PATH;
 export const HOW_IT_WORKS_HREF = "/#how-it-works";
 
-export const TABS: readonly SwapTab[] = ["overview", "new", "requests", "history", "public", "collections", "activity", "lookup"];
+export const TABS: readonly SwapTab[] = ["overview", "new", "requests", "history", "public", "collections", "activity", "lookup", "faucet"];
 
 /** Unknown, missing or tampered values fall back to the default view; the URL never breaks the page. */
 export const parseTab = (v: string | null | undefined): SwapTab => (TABS.includes(v as SwapTab) ? (v as SwapTab) : "overview");

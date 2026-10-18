@@ -1,7 +1,7 @@
 import { chromium, info, BASE, walletPage, check, sleep, results } from "./ui-lib.mjs";
 const b = await chromium.launch();
 const ignore = /503|Failed to load resource|\/api\/stats|stats:/;
-const tabs = ["", "?tab=new", "?tab=requests", "?tab=history", "?tab=public", "?tab=collections", "?tab=activity", "?tab=lookup"];
+const tabs = ["", "?tab=new", "?tab=requests", "?tab=history", "?tab=public", "?tab=collections", "?tab=activity", "?tab=lookup", "?tab=faucet"];
 for (const [label, idx, width] of [["desktop, wallet connected", 3, 1440], ["mobile, wallet connected", 3, 390], ["desktop, no wallet", null, 1440]]) {
   console.log(`\n== ${label} ==`);
   const { page, logs } = idx === null ? await (async () => { const ctx = await b.newContext({ viewport: { width, height: 900 } }); const p = await ctx.newPage(); const l = []; p.on("console", (m) => m.type() === "error" && l.push("console: " + m.text())); p.on("pageerror", (e) => l.push("pageerror: " + e)); return { page: p, logs: l }; })() : await walletPage(b, idx, { width, height: 900 });
