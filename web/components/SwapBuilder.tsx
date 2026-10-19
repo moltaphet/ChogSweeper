@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { AlertCircle, ArrowLeftRight, CheckCircle2, Gift, Globe, ImagePlus, Link2, Loader2, Plus, RefreshCw, Search, UserRound, Users, Wallet } from "lucide-react";
+import { useId, useMemo, useState } from "react";
+import { AlertCircle, ArrowLeftRight, CheckCircle2, Gift, Globe, ImagePlus, Link2, Loader2, LockKeyhole, Plus, RefreshCw, Search, UserRound, Users, Wallet } from "lucide-react";
 import { isAddress, type Address } from "viem";
 import { useConnect, usePublicClient, useReadContracts, useSwitchChain, useWriteContract } from "wagmi";
 import { useAccount } from "@/lib/useAccount";
@@ -34,7 +34,7 @@ export function SwapBuilder() {
   const { writeContractAsync } = useWriteContract();
   const queryClient = useQueryClient();
 
-  const { mode, setMode } = useHub();
+  const { mode, setMode, setTab } = useHub();
   const { collections, add: addCollection } = useCollections();
   const [newCollection, setNewCollection] = useState("");
 
@@ -247,6 +247,7 @@ export function SwapBuilder() {
       {/* ------------------------------ Trade type ------------------------------ */}
       <div className="border-b border-monad-border/70 px-5 py-5 sm:px-7">
         <ModeToggle mode={mode} onChange={setMode} />
+        <p className="mt-3 text-xs text-monad-muted">Need NFTs to practice? <button type="button" className="font-semibold text-monad-deep hover:underline" onClick={() => setTab("test-nfts")}>Get test NFTs</button></p>
       </div>
 
       {/* The ticket: two halves of one deal, separated by a perforated seam. */}
@@ -566,21 +567,36 @@ function ModeToggle({ mode, onChange }: { mode: OfferMode; onChange: (m: OfferMo
 }
 
 function MonField({ label, value, onChange, invalid }: { label: string; value: string; onChange: (v: string) => void; invalid: boolean }) {
+  const id = useId();
   return (
-    <div className="mt-4">
-      <label className="label" htmlFor={label}>{label}</label>
+    <div className="mt-4 rounded-xl border border-monad-border/70 bg-monad-surface/40 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <label className="label" htmlFor={id}>{label}</label>
+        <div role="radiogroup" aria-label={`${label} currency`} className="inline-flex items-center gap-1 rounded-lg border border-monad-border/70 bg-monad-surface/70 p-1">
+          <button type="button" role="radio" aria-checked="true" className="rounded-md bg-monad-tint px-2.5 py-1 text-xs font-semibold text-monad-deep ring-1 ring-inset ring-monad-primary/30">
+            MON
+          </button>
+          <button type="button" role="radio" aria-checked="false" disabled aria-describedby={`${id}-currency-note`} className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-monad-muted/80">
+            <LockKeyhole className="h-3 w-3" aria-hidden />
+            CHOG
+            <span className="rounded border border-monad-border/70 px-1 py-0.5 text-[9px] leading-none">Mainnet</span>
+          </button>
+        </div>
+      </div>
       <div className="relative mt-1.5">
         <input
-          id={label}
+          id={id}
           inputMode="decimal"
           className={`input pr-14 ${invalid ? "border-status-danger focus:border-status-danger" : ""}`}
           placeholder="0.0"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           aria-invalid={invalid}
+          aria-describedby={`${id}-currency-note`}
         />
         <span className="pointer-events-none absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-1.5 text-xs font-bold text-coin-ink"><MonTicker className="h-4" /></span>
       </div>
+      <p id={`${id}-currency-note`} className="mt-2 text-[11px] leading-relaxed text-monad-muted">CHOG payments are planned for mainnet. Currently unavailable.</p>
     </div>
   );
 }

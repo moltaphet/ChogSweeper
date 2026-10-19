@@ -3,7 +3,7 @@ import { discoverOwnedTokens, DEFAULT_DISCOVERY } from "../lib/server/discovery"
 import { buildApiNft } from "../lib/server/nft-types";
 import { getRegistry, registryFromEnv, resetRegistryCache } from "../lib/server/registry";
 import { rateLimit } from "../lib/server/ratelimit";
-import { clearMetadataMemory, getManyTokenMetadata, getTokenMetadata } from "../lib/server/tokens";
+import { clearMetadataMemory, getCollectionNames, getManyTokenMetadata, getTokenMetadata } from "../lib/server/tokens";
 import { getWalletNFTs } from "../lib/server/wallet";
 import { testDb } from "../../indexer/test/helpers";
 
@@ -111,11 +111,20 @@ describe("discoverOwnedTokens", () => {
     const r = await discoverOwnedTokens(client, OWNER, [{ address: PLAIN, startBlock: 0n }, { address: CHOG, startBlock: 0n }]);
     expect(r.tokens).toEqual([{ contract: CHOG, tokenId: "1" }]);
     expect(r.warnings.some((w) => w.includes(PLAIN))).toBe(true);
+    expect(r.partial).toBe(true);
   });
 
   it("caps enumeration per collection and says so", async () => {
     const owners = Object.fromEntries(Array.from({ length: 30 }, (_, i) => [String(i), OWNER]));
     const { client } = fakeChain({ [CHOG]: { enumerable: true, owners } });
+    const r = await discoverOwnedTokens(client, OWNER, [{ address: CHOG, startBlock: 0n }], { maxPerCollection: 10 });
+    expect(r.tokens).toHaveLength(10);
+    expect(r.partial).toBe(true);
+  });
+
+  it("caps the log fallback too, and reports an incomplete balance", async () => {
+    const ids = Array.from({ length: 15 }, (_, i) => String(i));
+    const { client } = fakeChain({ [CHOG]: { owners: Object.fromEntries(ids.map((id) => [id, OWNER])), receivedBy: { [OWNER]: ids } } });
     const r = await discoverOwnedTokens(client, OWNER, [{ address: CHOG, startBlock: 0n }], { maxPerCollection: 10 });
     expect(r.tokens).toHaveLength(10);
     expect(r.partial).toBe(true);
@@ -145,6 +154,11 @@ describe("buildApiNft", () => {
   it("unknown collections are unverified", () => {
     expect(buildApiNft({ ...base, imageUri: null, collection: undefined, collectionName: null })).toMatchObject({ verified: false, ecosystem: null, collectionName: "Unknown collection", image: null });
   });
+
+  it("keeps the requested chain in large on-chain image links", () => {
+    const n = buildApiNft({ ...base, chainId: 143, imageUri: `data:image/png;base64,${"A".repeat(20_000)}`, collection: undefined });
+    expect(n.image).toContain("&chainId=143");
+  });
 });
 
 describe("registry", () => {
@@ -157,6 +171,19 @@ describe("registry", () => {
   });
   it("ignores malformed entries", () => {
     expect(registryFromEnv({ VERIFIED_COLLECTIONS: "nope:monad,0x123:chog", NEXT_PUBLIC_COLLECTIONS: "garbage" }).size).toBe(0);
+  });
+  it("keeps explicit deploy blocks when an address is also tracked or Chog", () => {
+    const r = registryFromEnv({ NEXT_PUBLIC_COLLECTIONS: CHOG, NEXT_PUBLIC_CHOG_COLLECTION: CHOG, VERIFIED_COLLECTIONS: `${CHOG}:chog:1200` });
+    expect(r.get(CHOG)?.startBlock).toBe(1200n);
+    expect(registryFromEnv({ VERIFIED_COLLECTIONS: `${MONAD}:monad:invalid` }).has(MONAD)).toBe(false);
+  });
+  it("does not reuse an env-only registry for a healthy database, or verification across chains", async () => {
+    await getRegistry(null);
+    const db = await testDb();
+    await db.query("INSERT INTO nft_collections (address, name, verified, ecosystem) VALUES ($1,'DB',true,'monad')", [MONAD]);
+    expect((await getRegistry(db)).get(MONAD)?.name).toBe("DB");
+    expect((await getRegistry(null, 143)).size).toBe(0);
+    await db.end();
   });
   it("database rows override env, and a failing database falls back to env", async () => {
     const db = await testDb();
@@ -208,6 +235,14 @@ describe("token metadata service", () => {
     expect((await getTokenMetadata(client, 1, CHOG, "1")).name).toBe("Chog #1");
     expect((await getTokenMetadata(client, 1, CHOG, "2")).name).toBe("Two");
     expect((await getTokenMetadata(client, 2, CHOG, "1")).source).toBe("chain"); // other chain: not a cache hit
+  });
+
+  it("does not reuse collection names across chains", async () => {
+    const a = fakeChain({ [CHOG]: { name: "Testnet Chog", owners: {} } }).client;
+    const b = fakeChain({ [CHOG]: { name: "Mainnet Other", owners: {} } }).client;
+    a.chain = { id: 10143 }; b.chain = { id: 143 };
+    expect((await getCollectionNames(a, [CHOG])).get(CHOG)).toBe("Testnet Chog");
+    expect((await getCollectionNames(b, [CHOG])).get(CHOG)).toBe("Mainnet Other");
   });
 
   it("bulk resolution honours the time budget and still returns an entry per token", async () => {
@@ -268,6 +303,8 @@ describe("getWalletNFTs (database path and chain path)", () => {
     await db.query("INSERT INTO nft_tokens (contract, token_id, owner, name, image_uri, attributes, meta_status) VALUES ($1,1,$2,'Chog #1',$3,'[]','ok')", [CHOG, OWNER, SVG]);
     await db.query("INSERT INTO nft_tokens (contract, token_id, owner) VALUES ($1,2,$2)", [CHOG, OWNER]); // metadata not fetched yet
     await db.query("INSERT INTO nft_tokens (contract, token_id, owner, meta_status, name) VALUES ($1,3,$2,'ok','Not mine')", [CHOG, OTHER]);
+    await db.query("UPDATE nft_collections SET backfilled_to = 1000000");
+    await db.query("INSERT INTO indexer_cursors (name, block, block_hash) VALUES ('transfers',1000000,'0x1')");
 
     const { client, calls } = fakeChain({ [CHOG]: { name: "Chog", owners: { "1": OWNER, "2": OWNER }, uris: { "2": jsonUri({ name: "Chog #2 (resolved)", image: SVG }) } } });
     const r = await getWalletNFTs(OWNER, 10143, { db, client });
@@ -278,6 +315,17 @@ describe("getWalletNFTs (database path and chain path)", () => {
     // Written back, so the next call (or another instance) does not re-resolve.
     const stored = (await db.query("SELECT meta_status, name FROM nft_tokens WHERE token_id = 2")).rows[0];
     expect(stored).toMatchObject({ meta_status: "ok", name: "Chog #2 (resolved)" });
+  });
+
+  it("scans incomplete indexed collections, removes sold tokens and finds missing ones", async () => {
+    const db = await testDb();
+    await db.query("INSERT INTO nft_collections (address, name, is_chog, verified, ecosystem) VALUES ($1,'Chog',true,true,'chog')", [CHOG]);
+    await db.query("INSERT INTO nft_tokens (contract, token_id, owner, name, meta_status) VALUES ($1,1,$2,'Sold token','ok')", [CHOG, OWNER]);
+    const { client } = fakeChain({ [CHOG]: { name: "Chog", enumerable: true, owners: { "1": OTHER, "2": OWNER }, uris: { "2": meta1 } } });
+    const r = await getWalletNFTs(OWNER, 10143, { db, client });
+    expect(r.items.map((i) => i.tokenId)).toEqual(["2"]);
+    expect(r.source).toBe("mixed");
+    await db.end();
   });
 
   it("a failing database degrades to a chain scan instead of failing the request", async () => {

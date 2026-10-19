@@ -61,20 +61,15 @@ export async function runStream(o: StreamOptions): Promise<void> {
     const safe = head - o.confirmations;
     o.onProgress?.(cursor?.block ?? o.startBlock - 1n, head);
 
-    if (from > safe) {
-      if (o.untilCaughtUp) return;
-      await o.wake();
-      continue;
-    }
-
     // Reorg check: is our last processed block still on the canonical chain?
     if (cursor) {
       const canonical = await client.getBlock({ blockNumber: cursor.block });
       if (canonical.hash !== cursor.hash) {
-        const target = cursor.block - o.rewindDepth;
+        const target = cursor.block > o.rewindDepth ? cursor.block - o.rewindDepth : -1n;
         log.warn("reorg detected, rewinding", { stream: name, cursorBlock: cursor.block, rewindTo: target });
         const targetHash = target >= o.startBlock ? (await client.getBlock({ blockNumber: target })).hash : null;
         await db.tx(async (q) => {
+          await q.query("SELECT pg_advisory_xact_lock(hashtext($1))", [name]);
           await o.rewind(target + 1n, q);
           if (targetHash) await setCursor(q, name, target, targetHash);
           else await q.query("DELETE FROM indexer_cursors WHERE name = $1", [name]);
@@ -84,9 +79,16 @@ export async function runStream(o: StreamOptions): Promise<void> {
       }
     }
 
+    if (from > safe) {
+      if (o.untilCaughtUp) return;
+      await o.wake();
+      continue;
+    }
+
     const to = from + o.maxRange - 1n < safe ? from + o.maxRange - 1n : safe;
     const toBlock = await client.getBlock({ blockNumber: to });
     await db.tx(async (q) => {
+      await q.query("SELECT pg_advisory_xact_lock(hashtext($1))", [name]);
       await o.process(from, to, q);
       await setCursor(q, name, to, toBlock.hash);
     });

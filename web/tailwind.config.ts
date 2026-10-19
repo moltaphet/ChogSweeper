@@ -1,34 +1,35 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Monad Light palette. Every color used by the UI comes from these tokens.
+ * Monad palette. Semantic colors resolve from CSS variables so the same components work in both themes.
  */
 const config: Config = {
+  darkMode: "class",
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
         monad: {
-          bg: "#EFEAFF", // soft lavender tint used inside cards
-          surface: "#FFFFFF", // cards and surfaces
-          border: "#DDD6FE", // soft card border
-          primary: "#836EF9", // brand purple: buttons, active states, badges
-          deep: "#5E43F3", // hover states and primary typography accents
-          ink: "#1C1536", // headings and strong text
-          muted: "#4E4375", // muted labels (a notch darker so it stays readable on the violet page)
-          tint: "#EFEBFE", // light wash for selected / hover surfaces
+          bg: "rgb(var(--monad-bg) / <alpha-value>)",
+          surface: "rgb(var(--monad-surface) / <alpha-value>)",
+          border: "rgb(var(--monad-border) / <alpha-value>)",
+          primary: "rgb(var(--monad-primary) / <alpha-value>)",
+          deep: "rgb(var(--monad-deep) / <alpha-value>)",
+          ink: "rgb(var(--monad-ink) / <alpha-value>)",
+          muted: "rgb(var(--monad-muted) / <alpha-value>)",
+          tint: "rgb(var(--monad-tint) / <alpha-value>)",
         },
         // Status indicators. The base hues (#10B981 / #EF4444) are used for dots, icons and borders;
         // the *Ink shades are for small text on the tinted backgrounds so it stays readable (WCAG AA).
         status: {
-          active: "#10B981", // Verified / Active / Completed
-          activeInk: "#047857",
-          activeBg: "#ECFDF5",
-          danger: "#EF4444", // Expired / Cancelled / Declined
-          dangerInk: "#B91C1C",
-          dangerBg: "#FEF2F2",
-          warn: "#B7791F", // Unverified collection
-          warnBg: "#FEF3C7",
+          active: "rgb(var(--status-active) / <alpha-value>)",
+          activeInk: "rgb(var(--status-active-ink) / <alpha-value>)",
+          activeBg: "rgb(var(--status-active-bg) / <alpha-value>)",
+          danger: "rgb(var(--status-danger) / <alpha-value>)",
+          dangerInk: "rgb(var(--status-danger-ink) / <alpha-value>)",
+          dangerBg: "rgb(var(--status-danger-bg) / <alpha-value>)",
+          warn: "rgb(var(--status-warn) / <alpha-value>)",
+          warnBg: "rgb(var(--status-warn-bg) / <alpha-value>)",
         },
         // The one warm note: MON, the only thing in a trade that is not an NFT.
         coin: { DEFAULT: "#F5B544", ink: "#8A5A00", bg: "#FFF6E0" },
@@ -46,9 +47,7 @@ const config: Config = {
         mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       backgroundImage: {
-        // The brief's page wash: lavender -> white -> lavender.
-        // Monad violet: glows of the brand purple over a lavender-to-violet wash that deepens down the page.
-        page: "radial-gradient(1100px 650px at 6% -8%, rgba(131,110,249,0.55), transparent 62%), radial-gradient(900px 620px at 100% 12%, rgba(110,84,255,0.32), transparent 62%), radial-gradient(1000px 700px at 50% 108%, rgba(94,67,243,0.38), transparent 65%), linear-gradient(180deg, #EBE5FF 0%, #D6CBFF 42%, #BBAAFF 100%)",
+        page: "var(--page-gradient)",
         violet: "linear-gradient(135deg, #836EF9 0%, #5E43F3 100%)",
         "violet-soft": "linear-gradient(135deg, rgba(131,110,249,0.16), rgba(94,67,243,0.06))",
       },

@@ -72,7 +72,7 @@ export async function exportDeployment({
   const [owner, pendingOwner, treasury, platformFee, chogCollection] = await Promise.all(["owner", "pendingOwner", "treasury", "platformFee", "chogCollection"].map(read));
 
   const seed = (existsSync(resolve(ROOT, "config/verified-collections.json")) ? readJson(resolve(ROOT, "config/verified-collections.json")).chains?.[String(chainId)] : null) ?? [];
-  const collections = seed.map((c) => ({ address: getAddress(c.address), ecosystem: c.ecosystem, startBlock: Number(c.startBlock ?? 0), name: c.name ?? null, mock: false }));
+  const collections = seed.map((c) => ({ address: getAddress(c.address), ecosystem: c.ecosystem, startBlock: Number(c.startBlock ?? 0), name: c.name ?? null, mock: false, testArtwork: c.testArtwork ?? null }));
   if (mock && !collections.some((c) => c.address === mock.address)) collections.unshift({ address: mock.address, ecosystem: "chog", startBlock: mock.block, name: "Mock Chog", mock: true });
   // An externally supplied Chog contract (CHOG_COLLECTION at deploy time) is verified as Chog too.
   if (chogCollection !== "0x0000000000000000000000000000000000000000" && !collections.some((c) => c.address === getAddress(chogCollection))) {
@@ -106,6 +106,9 @@ export async function exportDeployment({
       NEXT_PUBLIC_COLLECTIONS: collections.map((c) => c.address).join(","),
       VERIFIED_COLLECTIONS: collections.map((c) => `${c.address}:${c.ecosystem}:${c.startBlock}`).join(","),
       INDEXER_CHAIN_ID: String(chainId),
+      NEXT_PUBLIC_TEST_R3TARDS_ADDRESS: collections.find((c) => c.testArtwork === "r3tards")?.address ?? "",
+      NEXT_PUBLIC_TEST_SKRUMPEYS_ADDRESS: collections.find((c) => c.testArtwork === "skrumpeys")?.address ?? "",
+      NEXT_PUBLIC_TEST_BOBS_ADDRESS: collections.find((c) => c.testArtwork === "the-bobs")?.address ?? "",
     },
     indexer: {
       CHAIN_ID: String(chainId),

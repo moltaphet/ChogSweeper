@@ -15,6 +15,7 @@ import { useUnread } from "../UnreadContext";
 import { Overview } from "./Overview";
 import { TestFaucet } from "./TestFaucet";
 import { TokenLookup } from "./TokenLookup";
+import { TestNfts } from "./TestNfts";
 
 const TABS = [{ id: "overview" as const, label: "Overview", icon: LayoutDashboard }, ...TOOLS.map((t) => ({ id: t.tab as HubTab, label: t.tabLabel, icon: t.icon }))];
 
@@ -72,7 +73,7 @@ function Workspace() {
         <div className="relative">
           {/* The glow is its own layer behind the card, so it never clips the sticky summary bar inside. */}
           <div className="pointer-events-none absolute -inset-x-2 -inset-y-8 -z-10 sm:-inset-x-6 rounded-[48px] bg-[radial-gradient(60%_60%_at_50%_30%,rgba(131,110,249,0.28),transparent_70%)] blur-2xl" aria-hidden />
-          <div className="rounded-[28px] border border-[#DDD6FE] bg-white/70 shadow-[0_1px_2px_rgba(94,67,243,0.06),0_24px_60px_-24px_rgba(94,67,243,0.38)] backdrop-blur-xl">
+          <div className="rounded-[28px] border border-monad-border bg-white/70 shadow-[0_1px_2px_rgba(94,67,243,0.06),0_24px_60px_-24px_rgba(94,67,243,0.38)] backdrop-blur-xl">
             <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="relative rounded-[27px]">
               <div className="pointer-events-none absolute inset-x-0 top-0 h-40 rounded-t-[27px] bg-gradient-to-b from-monad-primary/[0.08] to-transparent" aria-hidden />
               <div className="relative">
@@ -92,6 +93,7 @@ function Workspace() {
                 {tab === "activity" && <div className="p-5 sm:p-7"><ActivitySection /></div>}
                 {tab === "lookup" && <div className="p-5 sm:p-7"><TokenLookup /></div>}
                 {tab === "faucet" && <div className="p-5 sm:p-7"><TestFaucet /></div>}
+                {tab === "test-nfts" && <div className="p-5 sm:p-7"><TestNfts /></div>}
               </div>
             </div>
           </div>

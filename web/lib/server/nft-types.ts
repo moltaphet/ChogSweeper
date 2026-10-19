@@ -47,11 +47,11 @@ export function gatewayUrl(imageUri: string | null): string | null {
  *  - http://             the proxy only: a browser blocks plain-http images on an https page (mixed content)
  *  - data: (small)       inline;  data: (large)  served from /api/nft/image so it is not embedded in JSON lists
  */
-export function imageFields(imageUri: string | null, contract: string, tokenId: string): { image: string | null; imageFallbacks: string[] } {
+export function imageFields(imageUri: string | null, contract: string, tokenId: string, chainId?: number): { image: string | null; imageFallbacks: string[] } {
   if (!imageUri) return { image: null, imageFallbacks: [] };
   if (imageUri.startsWith("data:")) {
     return imageUri.length > INLINE_DATA_URI_LIMIT
-      ? { image: `/api/nft/image?contract=${contract}&tokenId=${tokenId}`, imageFallbacks: [] }
+      ? { image: `/api/nft/image?contract=${contract}&tokenId=${tokenId}${chainId === undefined ? "" : `&chainId=${chainId}`}`, imageFallbacks: [] }
       : { image: imageUri, imageFallbacks: [] };
   }
   const canonical = canonicalUri(imageUri) ?? imageUri;
@@ -65,6 +65,7 @@ export function imageFields(imageUri: string | null, contract: string, tokenId: 
 }
 
 export function buildApiNft(input: {
+  chainId?: number;
   contract: string;
   tokenId: string;
   name: string | null;
@@ -77,7 +78,7 @@ export function buildApiNft(input: {
 }): ApiNft {
   const { contract, tokenId, collection } = input;
   const collectionName = input.collectionName ?? collection?.name ?? "Unknown collection";
-  const { image, imageFallbacks } = imageFields(input.imageUri, contract, tokenId);
+  const { image, imageFallbacks } = imageFields(input.imageUri, contract, tokenId, input.chainId);
   return {
     contract, tokenId,
     name: input.name ?? `${collectionName} #${tokenId}`,

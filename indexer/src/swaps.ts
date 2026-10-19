@@ -171,6 +171,30 @@ export async function applySwapEvents(q: Queryable, events: readonly SwapEventRo
 export async function rewindSwaps(q: Queryable, fromBlock: bigint) {
   const { rows } = await q.query<{ swap_id: string }>("DELETE FROM swap_events WHERE block_number >= $1 RETURNING swap_id", [fromBlock.toString()]);
   await recomputeSwaps(q, rows.map((r) => String(r.swap_id)));
+  await recomputeParticipants(q);
+}
+
+/** Rebuild participant counts and first-seen data from the canonical swap projection after a reorg. */
+async function recomputeParticipants(q: Queryable) {
+  await q.query(
+    `WITH sightings AS (
+       SELECT maker AS address, created_block AS block, created_at AS at FROM swaps
+       UNION ALL SELECT taker, created_block, created_at FROM swaps WHERE taker IS NOT NULL
+       UNION ALL SELECT accepted_by, settled_block, settled_at FROM swaps WHERE accepted_by IS NOT NULL
+     ), canonical AS (
+       SELECT address, MIN(block) AS first_seen_block, MIN(at) AS first_seen_at
+         FROM sightings GROUP BY address
+     )
+     INSERT INTO participants (address, first_seen_block, first_seen_at)
+     SELECT address, first_seen_block, first_seen_at FROM canonical
+     ON CONFLICT (address) DO UPDATE SET
+       first_seen_block = EXCLUDED.first_seen_block,
+       first_seen_at = EXCLUDED.first_seen_at`,
+  );
+  await q.query(
+    `DELETE FROM participants p
+      WHERE NOT EXISTS (SELECT 1 FROM swaps s WHERE s.maker = p.address OR s.taker = p.address OR s.accepted_by = p.address)`,
+  );
 }
 
 /** Fetches and decodes ChogSweeper logs for a block range. */

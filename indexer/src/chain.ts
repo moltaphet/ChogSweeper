@@ -32,11 +32,9 @@ export interface Waker {
  * socket goes quiet, which is how reconnection is handled on top of viem's own socket reconnect.
  */
 export function createWaker(cfg: Config): Waker {
-  let waiters: Array<() => void> = [];
+  const waiters = new Set<() => void>();
   const fire = () => {
-    const w = waiters;
-    waiters = [];
-    for (const f of w) f();
+    for (const f of [...waiters]) f();
   };
 
   let unwatch: (() => void) | null = null;
@@ -81,12 +79,14 @@ export function createWaker(cfg: Config): Waker {
   return {
     wake: () =>
       new Promise<void>((resolve) => {
+        if (closed) return resolve();
         const t = setTimeout(done, cfg.pollMs);
         function done() {
           clearTimeout(t);
+          waiters.delete(done);
           resolve();
         }
-        waiters.push(done);
+        waiters.add(done);
       }),
     close() {
       closed = true;

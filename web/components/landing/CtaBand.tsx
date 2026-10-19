@@ -1,7 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { LAUNCHPAD_PATH } from "@/lib/routes";
-import { ChogCard } from "./ChogCard";
+import { NftCard } from "./NftCard";
 
 /** The closing call to action: the hero's dark stage again, so the page starts and ends on the same note. */
 export function CtaBand() {
@@ -14,14 +14,14 @@ export function CtaBand() {
         </div>
 
         <div className="mx-auto mb-8 flex max-w-xs items-end justify-center gap-3" aria-hidden>
-          <ChogCard id={21} slot={1} className="w-24 -rotate-6 sm:w-28" />
-          <ChogCard id={7} slot={2} className="mb-4 w-28 sm:w-32" />
-          <ChogCard id={42} slot={7} className="w-24 rotate-6 sm:w-28" />
+          <NftCard id={21} slot={1} className="w-24 -rotate-6 sm:w-28" />
+          <NftCard id={7} slot={2} className="mb-4 w-28 sm:w-32" />
+          <NftCard id={42} slot={7} className="w-24 rotate-6 sm:w-28" />
         </div>
 
         <h2 id="cta-title" className="font-display text-3xl font-extrabold tracking-tight text-white sm:text-5xl">Ready to swap your Chogs?</h2>
         <p className="mx-auto mt-4 max-w-lg text-white/70">Connect a wallet on Monad Testnet, bundle your NFTs and settle the whole deal in one transaction.</p>
-        <Link href={LAUNCHPAD_PATH} className="group mt-8 inline-flex items-center gap-2 rounded-2xl bg-white px-8 py-4 text-base font-bold text-[#3A1FB8] shadow-[0_18px_40px_-12px_rgba(167,139,250,0.9)] transition duration-200 hover:-translate-y-0.5">
+        <Link href={LAUNCHPAD_PATH} className="theme-always-white group mt-8 inline-flex items-center gap-2 rounded-2xl bg-white px-8 py-4 text-base font-bold text-[#3A1FB8] shadow-[0_18px_40px_-12px_rgba(167,139,250,0.9)] transition duration-200 hover:-translate-y-0.5">
           Open Launchpad <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" aria-hidden />
         </Link>
       </div>

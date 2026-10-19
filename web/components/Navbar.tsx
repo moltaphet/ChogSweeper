@@ -11,6 +11,7 @@ import { NavLinks } from "./site/NavLinks";
 import { NetworkSelector } from "./site/NetworkSelector";
 import { WalletButton } from "./site/WalletButton";
 import { useUnread } from "./UnreadContext";
+import { ThemeToggle } from "./ThemeToggle";
 
 /** On the landing page: which of these sections is the one currently under the header? */
 function useSectionInView(ids: readonly string[], enabled: boolean): string | null {
@@ -72,6 +73,7 @@ export function Navbar() {
         </nav>
 
         <div className="flex items-center gap-1.5 sm:gap-2.5">
+          <ThemeToggle />
           <span className="hidden lg:block"><NetworkSelector /></span>
           {inApp ? (
             <WalletButton />

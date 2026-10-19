@@ -7,6 +7,7 @@ import { nftReadAbi } from "./abi";
 import { INDEXER_CHAIN_ID } from "./chains";
 import { expandTokenUriTemplate, fetchMetadataJson, parseMetadata, type Trait } from "./nft-resolver";
 import { resolverOptions } from "./nft-types";
+import { withTimeout } from "./timeout";
 
 export interface TokenMetadata {
   name: string | null;
@@ -71,7 +72,7 @@ export function isDeterministicFailure(e: unknown): boolean {
 export async function withTimeoutRetry<T>(fn: () => Promise<T>, { timeoutMs = RPC_READ_TIMEOUT_MS, retries = RPC_READ_RETRIES, baseDelayMs = 250 } = {}): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     try {
-      return await Promise.race([fn(), new Promise<never>((_, rej) => setTimeout(() => rej(new Error(`rpc timeout after ${timeoutMs}ms`)), timeoutMs))]);
+      return await withTimeout(fn(), timeoutMs, `rpc timeout after ${timeoutMs}ms`);
     } catch (e) {
       if (isDeterministicFailure(e) || attempt >= retries) throw e;
       await sleep(baseDelayMs * 2 ** attempt);
@@ -231,34 +232,40 @@ export async function getManyTokenMetadata(
       while (next < tokens.length && Date.now() < deadline) {
         const t = tokens[next++]!;
         const remaining = Math.max(50, deadline - Date.now());
-        const timeout = new Promise<TokenMetadata>((r) =>
-          setTimeout(() => r({ name: null, description: null, imageUri: null, traits: [], tokenUri: null, state: "unresolved", error: "time budget exceeded", source: "chain" }), remaining),
-        );
         // The underlying resolution keeps running and warms the cache for the next request even if it loses the race.
-        out.set(`${t.contract.toLowerCase()}:${t.tokenId}`, await Promise.race([getTokenMetadata(client, chainId, t.contract, t.tokenId, { db: opts.db }), timeout]));
+        const meta = await withTimeout(getTokenMetadata(client, chainId, t.contract, t.tokenId, { db: opts.db }), remaining, "time budget exceeded")
+          .catch((e): TokenMetadata => ({ name: null, description: null, imageUri: null, traits: [], tokenUri: null, state: "unresolved", error: shortError(e), source: "chain" }));
+        out.set(`${t.contract.toLowerCase()}:${t.tokenId}`, meta);
       }
     }),
   );
   return out;
 }
 
-const names = new Map<string, string | null>();
+const names = new Map<string, { value: string | null; at: number }>();
 
-/** Collection names via one batched name() call per cache miss. Failures are remembered as null for the process lifetime. */
-export async function getCollectionNames(client: Pick<PublicClient, "multicall" | "readContract">, contracts: readonly string[]): Promise<Map<string, string | null>> {
-  const missing = [...new Set(contracts.map((c) => c.toLowerCase()))].filter((c) => !names.has(c));
+/** Names are isolated by chain; transient failures are retried after 30 seconds. */
+export async function getCollectionNames(client: Pick<PublicClient, "multicall" | "readContract"> & { chain?: { id: number } }, contracts: readonly string[]): Promise<Map<string, string | null>> {
+  const key = (c: string) => `${client.chain?.id ?? "unknown"}:${c.toLowerCase()}`;
+  const missing = [...new Set(contracts.map((c) => c.toLowerCase()))].filter((c) => {
+    const hit = names.get(key(c));
+    return !hit || Date.now() - hit.at >= (hit.value === null ? 30_000 : OK_TTL_MS);
+  });
   if (missing.length) {
     try {
       const res = await safeMulticall(
         client,
         missing.map((c) => ({ address: c as Address, abi: nftReadAbi, functionName: "name" as const })),
       );
-      res.forEach((r, i) => names.set(missing[i]!, r.status === "success" ? String(r.result).slice(0, 100) : null));
+      res.forEach((r, i) => {
+        if (names.size >= MEMORY_MAX) names.delete(names.keys().next().value!);
+        names.set(key(missing[i]!), { value: r.status === "success" ? String(r.result).slice(0, 100) : null, at: Date.now() });
+      });
     } catch {
       /* leave unknown; the caller falls back to a generic label */
     }
   }
-  return new Map(contracts.map((c) => [c.toLowerCase(), names.get(c.toLowerCase()) ?? null]));
+  return new Map(contracts.map((c) => [c.toLowerCase(), names.get(key(c))?.value ?? null]));
 }
 
 export function clearMetadataMemory() {

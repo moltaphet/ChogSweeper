@@ -27,7 +27,7 @@ export function HowItWorks() {
         {/* A dashed thread through the cards on wide screens: the order is real, so the line says so. */}
         <div className="pointer-events-none absolute left-[16%] right-[16%] top-[3.4rem] hidden border-t-2 border-dashed border-monad-border md:block" aria-hidden />
         {STEPS.map(({ icon: Icon, title, body }, i) => (
-          <li key={title} className="group relative rounded-3xl border border-[#DDD6FE] bg-gradient-to-br from-monad-tint via-[#F7F5FE] to-white p-6 shadow-card transition duration-300 hover:-translate-y-1 hover:shadow-lift">
+          <li key={title} className="group relative rounded-3xl border border-monad-border bg-gradient-to-br from-monad-tint via-monad-surface to-white p-6 shadow-card transition duration-300 hover:-translate-y-1 hover:shadow-lift">
             <div className="mb-5 flex items-start justify-between">
               <span className="relative flex h-[4.5rem] w-[4.5rem] items-center justify-center rounded-2xl border border-white bg-white shadow-[0_10px_24px_-12px_rgba(94,67,243,0.5)] transition duration-300 group-hover:scale-105 group-hover:-rotate-3">
                 <Icon />

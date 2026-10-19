@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { ChogCard } from "./ChogCard";
+import { NftCard } from "./NftCard";
 import { MonadLogo } from "@/components/site/MonadLogo";
 
 /** Ids of the Chogs that rain down. The same id always draws the same Chog. */
@@ -200,14 +200,14 @@ export function ChogPile() {
   }, []);
 
   return (
-    <section aria-label="A pile of Chog NFTs you can grab and throw" className="relative w-full pb-16">
+    <section aria-label="A mix of NFT artwork you can grab and throw" className="relative w-full pb-16">
       <div className="pointer-events-none absolute inset-x-0 top-4 z-10 flex justify-center" aria-hidden>
-        <span className="rounded-full bg-monad-ink px-3.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white shadow-card">Grab and throw the Chogs</span>
+        <span className="rounded-full bg-monad-ink px-3.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white shadow-card">Grab and throw the NFTs</span>
       </div>
       <div ref={box} className="relative h-[clamp(460px,80vh,780px)] w-full touch-pan-y select-none overflow-hidden bg-gradient-to-b from-transparent via-monad-tint/40 to-monad-tint/90">
         {IDS.map((id, i) => (
           <div key={id} ref={(el) => { if (el) pieces.current[i] = Object.assign(pieces.current[i] ?? { w: 0, h: 0 }, { el }); }} className="absolute left-0 top-0 will-change-transform" style={{ opacity: 0 }}>
-            <ChogCard id={id} slot={i} className="h-full w-full" />
+            <NftCard id={id} slot={i} className="h-full w-full" />
           </div>
         ))}
         {Array.from({ length: COINS }, (_, i) => (

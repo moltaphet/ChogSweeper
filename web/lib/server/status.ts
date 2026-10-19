@@ -1,5 +1,6 @@
 import type { PublicClient } from "viem";
 import type { Queryable } from "./queryable";
+import { withTimeout } from "./timeout";
 
 export type Level = "operational" | "degraded" | "outage";
 
@@ -25,7 +26,7 @@ export async function getSiteStatus(client: Pick<PublicClient, "getBlockNumber">
   const t0 = Date.now();
   let head: bigint | null = null;
   try {
-    head = await Promise.race([client.getBlockNumber(), new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), 4000))]);
+    head = await withTimeout(client.getBlockNumber(), 4000);
   } catch {
     head = null;
   }
@@ -35,7 +36,7 @@ export async function getSiteStatus(client: Pick<PublicClient, "getBlockNumber">
   let indexerOk: boolean | null = null;
   if (db) {
     try {
-      const { rows } = await db.query<{ block: string }>("SELECT block FROM indexer_cursors WHERE name = 'sweeper'");
+      const { rows } = await withTimeout(db.query<{ block: string }>("SELECT block FROM indexer_cursors WHERE name = 'sweeper'"), 4000);
       if (rows[0] && head !== null) {
         lagBlocks = Math.max(0, Number(head - BigInt(rows[0].block)));
         indexerOk = lagBlocks <= LAG_DEGRADED_BLOCKS;
@@ -47,7 +48,7 @@ export async function getSiteStatus(client: Pick<PublicClient, "getBlockNumber">
     }
   }
 
-  const level: Level = !rpc.ok ? "outage" : indexerOk === false ? "degraded" : "operational";
+  const level: Level = !rpc.ok ? "outage" : indexerOk !== true ? "degraded" : "operational";
   const message =
     level === "operational" ? "All systems operational on Monad Testnet"
     : level === "outage" ? "Cannot reach Monad Testnet right now"

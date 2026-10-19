@@ -1,0 +1,59 @@
+{
+  "chainId": 10143,
+  "exportedAt": "2026-10-12T21:23:12.168Z",
+  "deployer": "0x9425CBe19643112Ff7801A805c0de6615Bbc3097",
+  "sweeper": {
+    "address": "0xc03F11e7114254F0b3b08E288d0fF496677D5d28",
+    "block": 70087509,
+    "tx": "0xa41de5e91bd752ffb77faca065feac7f7cd29957e328472c75dc707c6b011bcf"
+  },
+  "mockChog": {
+    "address": "0xa1E4279a8E6F302F6f9DDb8f57CeDCB71A52f931",
+    "block": 70087508,
+    "tx": "0x839a9b54a4f0e1546deb1d86343c652dc27c559356413e3207668e8aaaaadb48"
+  },
+  "config": {
+    "owner": "0x9425CBe19643112Ff7801A805c0de6615Bbc3097",
+    "pendingOwner": "0x0000000000000000000000000000000000000000",
+    "treasury": "0x9425CBe19643112Ff7801A805c0de6615Bbc3097",
+    "platformFeeWei": "50000000000000000",
+    "chogCollection": "0xa1E4279a8E6F302F6f9DDb8f57CeDCB71A52f931"
+  },
+  "verifiedCollections": [
+    {
+      "address": "0xa1E4279a8E6F302F6f9DDb8f57CeDCB71A52f931",
+      "ecosystem": "chog",
+      "startBlock": 70087508,
+      "name": "Mock Chog",
+      "mock": true
+    },
+    {
+      "address": "0x786bd6B0a35c5053877D66cdDe88A6b2338EC69c",
+      "ecosystem": "monad",
+      "startBlock": 70502856,
+      "name": "Mock Molandak",
+      "mock": false
+    },
+    {
+      "address": "0x1f7d461268e5568D09eAe9182429c3F0644E4382",
+      "ecosystem": "monad",
+      "startBlock": 70502856,
+      "name": "Mock Moyaki",
+      "mock": false
+    },
+    {
+      "address": "0x34eD3457B063057742a64e83D3a58fC75eF9e12a",
+      "ecosystem": "monad",
+      "startBlock": 70502856,
+      "name": "Mock Chewy",
+      "mock": false
+    },
+    {
+      "address": "0x422CC82C81551bebED18Ce2B7204113F1401A386",
+      "ecosystem": "monad",
+      "startBlock": 70502857,
+      "name": "Mock Mop",
+      "mock": false
+    }
+  ]
+}

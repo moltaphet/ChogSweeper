@@ -26,7 +26,8 @@ export async function GET(req: NextRequest) {
   const extra = (p.get("collections") ?? "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
 
   if (!isAddress(address, { strict: false })) return badRequest("address must be a valid 0x address");
-  if (!Number.isInteger(chainId)) return badRequest("chainId must be an integer");
+  if (!Number.isSafeInteger(chainId)) return badRequest("chainId must be an integer");
+  if (!supportedChainIds().includes(chainId)) return badRequest(`chainId must be one of ${supportedChainIds().join(", ")}`);
   if (collection && collection !== "chog" && !isAddress(collection, { strict: false })) return badRequest("collection must be a 0x address or 'chog'");
   if (extra.length > 10 || extra.some((a) => !isAddress(a, { strict: false }))) return badRequest("collections must be up to 10 valid addresses");
 

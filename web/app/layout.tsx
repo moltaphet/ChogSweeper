@@ -20,7 +20,10 @@ export const viewport: Viewport = { themeColor: "#D6CBFF" };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
+    <html lang="en" suppressHydrationWarning className={`${display.variable} ${body.variable} ${mono.variable}`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `(()=>{try{const t=localStorage.getItem('chogsweeper-theme');const d=t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.classList.toggle('dark',d);const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=d?'#100A1D':'#D6CBFF'}catch(e){}})()` }} />
+      </head>
       <body>
         <Providers>
           {/* Soft violet atmosphere behind the top of every page. */}

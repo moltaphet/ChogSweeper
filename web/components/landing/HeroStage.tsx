@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { ChogCard } from "./ChogCard";
+import { NftCard } from "./NftCard";
 
 /** Where each card sits in the fan. x/y are percentages of the scene; px/py are how far the mouse moves it (depth). */
 const CARDS = [
@@ -58,7 +58,7 @@ export function HeroScene() {
       className="relative mx-auto h-[420px] w-full max-w-[640px] select-none [--k:0.72] sm:h-[540px] sm:[--k:0.9] lg:h-[600px] lg:[--k:1]"
       style={{ perspective: "1400px", ["--mx" as string]: 0, ["--my" as string]: 0 }}
       role="img"
-      aria-label="Illustration: a fan of Chog NFTs floating above a swap portal"
+      aria-label="Illustration: Chog, r3tards, skrumpeys and The Bobs artwork floating above a swap portal"
     >
       {/* portal */}
       <div className="absolute left-1/2 top-[52%] aspect-square w-[88%] -translate-x-1/2 -translate-y-1/2" aria-hidden>
@@ -70,7 +70,7 @@ export function HeroScene() {
 
       {/* sparks */}
       {SPARKS.map((s, i) => (
-        <span key={i} className="absolute animate-twinkle rounded-full bg-white" style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.s, height: s.s, ["--dur" as string]: `${s.d}s`, animationDelay: `${s.delay}s`, boxShadow: "0 0 8px 1px rgba(255,255,255,0.8)" }} aria-hidden />
+        <span key={i} className="theme-always-white absolute animate-twinkle rounded-full bg-white" style={{ left: `${s.x}%`, top: `${s.y}%`, width: s.s, height: s.s, ["--dur" as string]: `${s.d}s`, animationDelay: `${s.delay}s`, boxShadow: "0 0 8px 1px rgba(255,255,255,0.8)" }} aria-hidden />
       ))}
 
       {/* the fan of cards */}
@@ -89,7 +89,7 @@ export function HeroScene() {
           }}
         >
           <div className="animate-float" style={{ ["--r" as string]: `${c.r}deg`, ["--dur" as string]: `${c.dur}s`, ["--fy" as string]: `${c.fy}px`, transform: `rotate(${c.r}deg)` }}>
-            <ChogCard id={c.id} slot={c.slot} />
+            <NftCard id={c.id} slot={c.slot} />
           </div>
         </div>
       ))}

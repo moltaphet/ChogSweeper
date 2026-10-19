@@ -101,7 +101,7 @@ describe("site status (a measured fact, not a constant)", () => {
     expect((await getSiteStatus(client(10_000n), broken as any)).level).toBe("degraded");
   });
 
-  it("operational with no database configured (indexer is optional; the app falls back to the chain)", async () => {
-    expect((await getSiteStatus(client(5n), null)).level).toBe("operational");
+  it("reports degraded when no database is configured: chain works but activity and lists do not", async () => {
+    expect((await getSiteStatus(client(5n), null)).level).toBe("degraded");
   });
 });

@@ -57,6 +57,8 @@ async function recomputeOwners(q: Queryable, tokens: ReadonlyArray<readonly [str
 
 /** Reorg: drop transfers >= fromBlock and re-derive owners. Returns the wallets affected. */
 export async function rewindTransfers(q: Queryable, fromBlock: bigint): Promise<string[]> {
+  // Backfill shares this history. Rewind its watermark too, including ranges with no transfers.
+  await q.query("UPDATE nft_collections SET backfilled_to = LEAST(backfilled_to, $1::bigint - 1)", [fromBlock.toString()]);
   const { rows } = await q.query<{ contract: string; token_id: string; from_addr: string; to_addr: string }>(
     "DELETE FROM nft_transfers WHERE block_number >= $1 RETURNING contract, token_id, from_addr, to_addr",
     [fromBlock.toString()],
@@ -70,6 +72,14 @@ export async function rewindTransfers(q: Queryable, fromBlock: bigint): Promise<
   );
   await recomputeOwners(q, tokens);
   return [...new Set(rows.flatMap((r) => [r.from_addr, r.to_addr]).filter((a) => a !== ZERO))];
+}
+
+/** Live blocks extend a collection's watermark only after its older history is complete. */
+export async function advanceTransferCoverage(q: Queryable, from: bigint, to: bigint) {
+  await q.query(
+    "UPDATE nft_collections SET backfilled_to = GREATEST(backfilled_to, $2::bigint) WHERE backfilled_to >= $1::bigint - 1",
+    [from.toString(), to.toString()],
+  );
 }
 
 export async function fetchTransfers(client: PublicClient, addresses: Address[], from: bigint, to: bigint): Promise<TransferRow[]> {

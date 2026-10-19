@@ -11,6 +11,7 @@ import { useHub } from "../HubContext";
 import { useUnread } from "../UnreadContext";
 import { LiveDot } from "../site/LiveDot";
 import { MonTicker } from "@/components/site/MonTicker";
+import { TestNfts } from "./TestNfts";
 
 /** The Launchpad's front door: live numbers, the two ways to start a trade, and a card for every other tool. */
 export function Overview() {
@@ -51,6 +52,8 @@ export function Overview() {
           </div>
         ))}
       </dl>
+
+      <TestNfts />
 
       <section aria-labelledby="tools-title">
         <h2 id="tools-title" className="mb-3 text-sm font-bold">All tools</h2>

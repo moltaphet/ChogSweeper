@@ -62,7 +62,7 @@ export function Hero() {
             </p>
 
             <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Link href={LAUNCHPAD_PATH} className="group inline-flex items-center gap-2 rounded-2xl bg-white px-7 py-4 text-base font-bold text-[#3A1FB8] shadow-[0_18px_40px_-12px_rgba(167,139,250,0.9)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_48px_-12px_rgba(196,181,253,1)]">
+              <Link href={LAUNCHPAD_PATH} className="theme-always-white group inline-flex items-center gap-2 rounded-2xl bg-white px-7 py-4 text-base font-bold text-[#3A1FB8] shadow-[0_18px_40px_-12px_rgba(167,139,250,0.9)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_22px_48px_-12px_rgba(196,181,253,1)]">
                 Open Launchpad <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" aria-hidden />
               </Link>
               <a href="#how-it-works" className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-6 py-4 text-base font-semibold text-white backdrop-blur transition duration-200 hover:border-white/40 hover:bg-white/15">

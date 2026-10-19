@@ -47,7 +47,7 @@ export async function getWalletNFTs(walletAddress: string, chainId: number, opti
   const db = chainId === INDEXER_CHAIN_ID ? (options.db === undefined ? getDbOrNull() : options.db) : null;
   const extra = [...new Set((options.extraCollections ?? []).filter((a) => isAddress(a, { strict: false })).map((a) => a.toLowerCase()))].slice(0, MAX_EXTRA);
 
-  const registry = await getRegistry(db);
+  const registry = await getRegistry(db, chainId);
   const warnings: string[] = [];
   let partial = false;
 
@@ -65,10 +65,14 @@ export async function getWalletNFTs(walletAddress: string, chainId: number, opti
                 t.attributes, t.meta_status
            FROM nft_tokens t JOIN nft_collections c ON c.address = t.contract
           WHERE t.owner = $1
-          ORDER BY t.contract, t.token_id LIMIT 1000`,
+          ORDER BY t.contract, t.token_id`,
         [owner],
       );
-      const tracked = await db.query<{ address: string }>("SELECT address FROM nft_collections");
+      const tracked = await db.query<{ address: string }>(
+        `SELECT c.address FROM nft_collections c JOIN indexer_cursors i ON i.name = 'transfers'
+          WHERE c.backfilled_to >= i.block AND c.backfilled_to >= c.start_block
+            AND i.updated_at > now() - interval '60 seconds'`,
+      );
       tracked.rows.forEach((x) => coveredByDb.add(x.address.toLowerCase()));
       for (const x of r) {
         rows.set(key(x.contract, x.token_id), {
@@ -90,6 +94,10 @@ export async function getWalletNFTs(walletAddress: string, chainId: number, opti
   const toScan = [...wanted.values()].filter((t) => !(usedDb && coveredByDb.has(t.address)));
 
   if (toScan.length) {
+    const indexed = new Map(rows);
+    const scanning = new Set(toScan.map((t) => t.address));
+    // A stale/incomplete index must not keep showing tokens the wallet has already sold.
+    for (const [k, row] of rows) if (scanning.has(row.contract.toLowerCase())) rows.delete(k);
     try {
       const found = await discoverOwnedTokens(client, owner, toScan);
       usedChain = true;
@@ -97,7 +105,7 @@ export async function getWalletNFTs(walletAddress: string, chainId: number, opti
       warnings.push(...found.warnings);
       for (const t of found.tokens) {
         const k = key(t.contract, t.tokenId);
-        if (!rows.has(k)) rows.set(k, { contract: t.contract, tokenId: t.tokenId, name: null, description: null, imageUri: null, traits: [], meta: "pending" });
+        if (!rows.has(k)) rows.set(k, indexed.get(k) ?? { contract: t.contract, tokenId: t.tokenId, name: null, description: null, imageUri: null, traits: [], meta: "pending" });
       }
     } catch (e) {
       partial = true;
@@ -121,7 +129,7 @@ export async function getWalletNFTs(walletAddress: string, chainId: number, opti
   const chainNames = await getCollectionNames(client, [...new Set([...rows.values()].map((r) => r.contract))]);
   const nameOf = (e: RegistryEntry | undefined, contract: string) => e?.name ?? chainNames.get(contract.toLowerCase()) ?? null;
   const items = [...rows.values()]
-    .map((r) => buildApiNft({ ...r, traits: r.traits, collection: registry.get(r.contract.toLowerCase()), collectionName: nameOf(registry.get(r.contract.toLowerCase()), r.contract) }))
+    .map((r) => buildApiNft({ ...r, chainId, traits: r.traits, collection: registry.get(r.contract.toLowerCase()), collectionName: nameOf(registry.get(r.contract.toLowerCase()), r.contract) }))
     .sort((a, b) =>
       Number(b.isChog) - Number(a.isChog) || Number(b.verified) - Number(a.verified) ||
       a.contract.localeCompare(b.contract) || (BigInt(a.tokenId) < BigInt(b.tokenId) ? -1 : 1));

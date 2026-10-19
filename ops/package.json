@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev:backend": "node dev-backend.mjs",
     "export": "node export-deployment.mjs",
     "smoke": "node smoke.mjs",
     "e2e:local": "node e2e-local.mjs"

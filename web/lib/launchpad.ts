@@ -1,4 +1,4 @@
-import { Activity, BadgeCheck, Clock, Droplets, Globe, Inbox, Plus, Search, type LucideIcon } from "lucide-react";
+import { Activity, BadgeCheck, Clock, Droplets, FlaskConical, Globe, Inbox, Plus, Search, type LucideIcon } from "lucide-react";
 import type { SwapTab, TradeMode } from "./routes";
 
 /** One tool of the Launchpad. `tab` is the workspace view it opens; `mode` preselects Direct or Public for a new trade. */
@@ -22,4 +22,5 @@ export const TOOLS: readonly LaunchpadTool[] = [
   { tab: "activity", label: "Live activity", tabLabel: "Activity", blurb: "Marketplace totals and the latest trades, straight from the indexer.", icon: Activity },
   { tab: "lookup", label: "Token lookup", tabLabel: "Lookup", blurb: "Check any ERC-721 by contract and token id before you trade it.", icon: Search },
   { tab: "faucet", label: "Test faucet", tabLabel: "Test Faucet", blurb: "Testnet only: get test MON, mint free test NFTs and try a swap in a few clicks.", icon: Droplets },
+  { tab: "test-nfts", label: "Get test NFTs", tabLabel: "Test NFTs", blurb: "Mint test replicas of r3tards, skrumpeys and The Bobs to practice trading on Monad Testnet.", icon: FlaskConical },
 ];

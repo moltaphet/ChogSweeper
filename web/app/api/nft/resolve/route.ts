@@ -63,13 +63,13 @@ export async function GET(req: NextRequest) {
     // 2. Metadata through the layered cache (memory, Redis, database, chain + gateways).
     const [meta, registry, names] = await Promise.all([
       getTokenMetadata(client, chainId, contract, tokenId),
-      getRegistry(chainId === INDEXER_CHAIN_ID ? getDbOrNull() : null),
+      getRegistry(chainId === INDEXER_CHAIN_ID ? getDbOrNull() : null, chainId),
       getCollectionNames(client, [contract]),
     ]);
     const entry = registry.get(contract);
 
     const nft = buildApiNft({
-      contract, tokenId, name: meta.name, description: meta.description, imageUri: meta.imageUri, traits: meta.traits,
+      contract, tokenId, chainId, name: meta.name, description: meta.description, imageUri: meta.imageUri, traits: meta.traits,
       meta: meta.state === "ok" ? "ok" : "unresolved", collection: entry, collectionName: entry?.name ?? names.get(contract) ?? null,
     });
 

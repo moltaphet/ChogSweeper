@@ -21,6 +21,7 @@ build/
 
 # Local run artifacts & dev logs
 .e2e/
+.local/
 *.log
 
 # Forge broadcast logs

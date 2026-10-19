@@ -114,8 +114,9 @@ Response: `{ "swaps": [...], "nextCursor": "12" | null }`, newest first.
   `startBlock` in the background, and then followed live. Use the collection's deploy block as `startBlock`.
 - **Cron / serverless fallback**: `node dist/main.js --once` catches up and exits (Cloud Run Job, GitHub Actions,
   Vercel Cron via a container). It gives minute-level freshness instead of sub-second.
-- **Scale**: one active worker per stream is enough. The metadata queue is already safe for multiple workers
-  (`FOR UPDATE SKIP LOCKED`); run more replicas of the metadata task alone if a large collection backfills slowly.
+- **Scale**: one active indexer process should own each event stream. The metadata queue uses `FOR UPDATE SKIP LOCKED`,
+  but the current process starts metadata and both event streams together, so it does not support metadata-only replicas.
+  Increase `METADATA_CONCURRENCY` for a larger metadata backlog; separate worker roles before scaling metadata independently.
 - **Retention**: `nft_transfers` grows with chain activity. Rows older than the finality window can be pruned for
   tokens that have a later transfer; ownership only needs the newest row per token.
 

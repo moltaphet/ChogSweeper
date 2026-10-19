@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { isAddress } from "viem";
-import { INDEXER_CHAIN_ID, getClient } from "@/lib/server/chains";
-import { badRequest, isTokenId, limited } from "@/lib/server/http";
+import { INDEXER_CHAIN_ID, UnsupportedChainError, getClient, supportedChainIds } from "@/lib/server/chains";
+import { badRequest, isTokenId, limited, parseChainId } from "@/lib/server/http";
 import { proxyImage } from "@/lib/server/image-proxy";
 import { decodeDataUri } from "@/lib/server/nft-resolver";
 import { getTokenMetadata } from "@/lib/server/tokens";
@@ -37,10 +37,18 @@ export async function GET(req: NextRequest) {
   // ---- on-chain (data:) image ---------------------------------------------------------------------------------
   const contract = (p.get("contract") ?? "").toLowerCase();
   const tokenId = p.get("tokenId") ?? "";
+  const chainId = parseChainId(p.get("chainId"), INDEXER_CHAIN_ID);
   if (!isAddress(contract, { strict: false })) return badRequest("pass url=…, or contract=0x…&tokenId=…");
   if (!isTokenId(tokenId)) return badRequest("tokenId must be a non-negative integer");
+  if (!Number.isSafeInteger(chainId)) return badRequest("chainId must be an integer");
 
-  const meta = await getTokenMetadata(getClient(INDEXER_CHAIN_ID), INDEXER_CHAIN_ID, contract, tokenId);
+  let meta;
+  try {
+    meta = await getTokenMetadata(getClient(chainId), chainId, contract, tokenId);
+  } catch (e) {
+    if (e instanceof UnsupportedChainError) return badRequest(`chainId must be one of ${supportedChainIds().join(", ")}`);
+    return NextResponse.json({ error: "temporarily unavailable" }, { status: 503 });
+  }
   const decoded = meta.imageUri?.startsWith("data:") ? decodeDataUri(meta.imageUri) : null;
   if (!decoded) return NextResponse.json({ error: "no on-chain image for this token" }, { status: 404 });
 

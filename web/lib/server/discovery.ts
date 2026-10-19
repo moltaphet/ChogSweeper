@@ -71,6 +71,7 @@ export async function discoverOwnedTokens(
     targets.map(async (t, i) => {
       const b = balances[i]!;
       if (b.status !== "success") {
+        result.partial = true;
         result.warnings.push(`${t.address}: balanceOf failed (not an ERC-721?)`);
         return;
       }
@@ -89,6 +90,10 @@ export async function discoverOwnedTokens(
         }
         const viaLogs = await viaTransferLogs(client, t, owner, balance, o, deadline);
         result.tokens.push(...viaLogs.tokens.map((id) => ({ contract: t.address, tokenId: id })));
+        if (balance > BigInt(o.maxPerCollection)) {
+          result.partial = true;
+          result.warnings.push(`${t.address}: showing at most ${o.maxPerCollection} of ${balance} tokens`);
+        }
         if (viaLogs.tokens.length < Number(balance > BigInt(o.maxPerCollection) ? BigInt(o.maxPerCollection) : balance)) {
           result.partial = true;
           result.warnings.push(`${t.address}: found ${viaLogs.tokens.length} of ${balance} tokens (${viaLogs.reason})`);
@@ -164,5 +169,5 @@ async function viaTransferLogs(client: Reader, t: DiscoveryTarget, owner: string
     to = from - 1n;
   }
   if (to < lowest && BigInt(owned.size) < want) reason = `only the last ${o.logLookback} blocks were scanned`;
-  return { tokens: [...owned], reason };
+  return { tokens: [...owned].slice(0, o.maxPerCollection), reason };
 }

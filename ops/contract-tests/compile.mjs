@@ -11,6 +11,7 @@ const add = (name, file) => (sources[name] = { content: fs.readFileSync(file, "u
 add("src/ChogSweeper.sol", `${ROOT}/src/ChogSweeper.sol`);
 add("src/MockChog.sol", `${ROOT}/src/MockChog.sol`);
 add("src/MockCollection.sol", `${ROOT}/src/MockCollection.sol`);
+add("src/TestArtworkCollection.sol", `${ROOT}/src/TestArtworkCollection.sol`);
 add("helpers/JsMocks.sol", path.join(HERE, "helpers/JsMocks.sol"));
 const input = { language: "Solidity", sources, settings: { optimizer: { enabled: true, runs: 1000 }, evmVersion: "shanghai", outputSelection: { "*": { "*": ["abi", "evm.bytecode.object"] } } } };
 const findImports = (p) => {

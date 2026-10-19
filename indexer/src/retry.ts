@@ -2,6 +2,7 @@ import { log } from "./log.js";
 
 export const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve) => {
+    if (signal?.aborted) return resolve();
     const t = setTimeout(done, ms);
     function done() {
       clearTimeout(t);
