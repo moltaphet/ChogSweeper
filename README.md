@@ -1,88 +1,278 @@
 # ChogSweeper
 
-Peer-to-peer NFT and MON swaps on Monad: escrow contract, indexer, API and trade-builder UI.
+**Peer-to-peer NFT swaps, settled atomically on Monad.**
 
-| Path | What |
-| --- | --- |
-| `src/` | `ChogSweeper.sol` escrow, `MockChog.sol` testnet collection |
-| `script/` | `DeployChogSweeper.s.sol` |
-| `test/` | Foundry tests (unit, fuzz, invariant) |
-| `indexer/` | event/transfer indexer and metadata worker |
-| `db/` | SQL migrations (source of truth for the schema) |
-| `docs/` | `ARCHITECTURE.md`, `DEPLOYMENT.md` |
-| `scripts/` | `sync-shared.mjs` copies `shared/nft-resolver.ts` into `indexer/` and `web/` |
-| `web/` | Next.js app and API routes |
-| `shared/` | `nft-resolver.ts`, the canonical metadata resolver (a copy lives in `web/lib/server/`) |
-| `ops/` | deployment exporter, smoke test, local full-stack runner, `contract-tests/` (Foundry-free contract tests), `ui-e2e/` (browser tests) |
-| `config/` | verified-collection seed list per chain |
+[Open the app](https://chogsweeper.xyz) · [Source code](https://github.com/moltaphet/ChogSweeper) · [Architecture](docs/ARCHITECTURE.md) · [Testnet deployment](docs/DEPLOYMENT.md) · [Indexer hosting](docs/INDEXER_DEPLOY.md)
 
-## How a swap works
+ChogSweeper is an EVM application for trading ERC-721 NFTs and native MON directly between wallets. A maker describes both sides of a trade and deposits the offered assets into the ChogSweeper escrow. A designated wallet can accept a direct offer, or anyone can accept a public offer. The contract transfers both sides in one transaction or leaves the offer open for cancellation, decline, or expiry handling.
 
-1. The **maker** escrows up to 10 NFTs and/or MON, says what they want (NFTs and/or MON, or nothing for a gift), who may accept (one wallet or anyone) and when it expires.
-2. The maker pays a flat **platform fee** at creation. It is **refunded** if the swap is cancelled or declined and kept only when it is accepted. Chog holders pay nothing; partner-collection holders get 25% off per token (up to 4).
-3. The **taker** pays exactly the MON the maker asked for and both sides settle in one transaction.
-4. Only collections on the contract's **verified list** can appear in a swap.
+The repository contains the escrow contract, a Next.js application, a Monad event and NFT indexer, and local deployment and test tooling. The current wallet flow targets **Monad Testnet**. The software is unaudited and should be treated as experimental.
 
-## Payment currencies: MON now, CHOG planned for mainnet
+## What the app does
 
-- **MON is the only supported payment currency today.** The Launchpad uses native MON for the offered/requested payment amounts. Platform fees and network gas are also paid in MON.
-- **CHOG is shown alongside MON in both sides of the Launchpad trade builder, but is disabled and marked “Mainnet”.** It cannot be selected, entered as a payment amount, approved or transferred through the current trading flow.
-- **CHOG payment support is planned for the mainnet release.** The current escrow contract supports NFTs and native MON; showing CHOG in the interface does not add token settlement support. Activation requires the payment-token contract configuration, escrow support, approval flow and validation before release. Switching networks alone does not enable it.
-- The planned CHOG payment token is separate from the **Chog NFTs** already supported in swaps and used for the holder fee exemption.
+- Create direct or public offers with up to 10 ERC-721 tokens per side, native MON, or both.
+- Browse incoming requests, outgoing offers, public trades, transaction history, collections, and recent activity.
+- Load wallet NFTs, resolve token metadata, and preview trade assets before signing.
+- Require each collection to be on the escrow contract's verified list before it can be offered or requested.
+- Refund the maker's platform fee when a trade is cancelled or declined; retain it only after acceptance.
+- Run a test faucet flow for Monad Testnet mock collections and show artwork previews for **r3tards**, **skrumpeys**, and **The Bobs**.
 
-## Artwork and test NFTs
+### How settlement works
 
-The landing page mixes Chog artwork with the supplied **r3tards**, **skrumpeys** and **The Bobs** samples.
-The 30 supplied images are served as optimized WebP files from `web/public/collections/`.
-Decorative cards do not represent a visitor's wallet holdings.
+1. The maker selects the offered NFTs and MON, specifies the requested NFTs and MON, chooses a direct recipient or an open offer, and sets an expiry.
+2. The maker approves the escrow to transfer the selected NFTs and creates the offer. The maker sends the offered MON plus the quoted platform fee.
+3. The taker accepts with exactly the requested MON. The contract transfers the NFTs and MON to their recipients atomically.
+4. The maker can cancel an active offer; a designated taker can decline a direct offer. Both actions return the escrowed assets and fee to the maker. Expiry does not automatically return assets: the maker must cancel an expired offer.
 
-The Launchpad's Overview and **Test NFTs** tab (`/launchpad?tab=test-nfts`) show the three collections.
-Their test replicas use `TestArtworkCollection.sol`: each wallet can claim **3 NFTs per collection, once**,
-with no mint price (test MON is required for gas). Artwork cycles through the 10 samples in each collection.
-These are separately deployed practice NFTs with no monetary value, not original collection tokens.
+The fee is paid by the maker, not the taker. Chog holders are exempt under the configured holder check; an optional partner collection can reduce the fee by 25% per token, up to four tokens. The owner can change future fee settings, but existing trades keep the fee quoted when they were created. Collected fees can only be withdrawn to the configured treasury.
 
-**Current setup:** artwork previews work locally. Minting is disabled with “Deployment pending” until the
-replica contracts are deployed, registered in the escrow's verified list, and their addresses are configured.
-For images to display inside external wallets, the WebP assets need a stable public HTTPS URL;
-`127.0.0.1` cannot serve another visitor's wallet.
+**MON is the only payment currency implemented in the contract.** The trade builder displays CHOG as a disabled, mainnet-planned option. It cannot be selected or transferred. CHOG payment support would require ERC-20 settlement and approvals in the contract before it could be enabled. Chog NFTs and the planned CHOG payment token are separate things.
 
-Once an HTTPS host is available:
+## Network and current test deployment
 
-1. Publish `collections/r3tards/01.webp` through `10.webp`, `collections/skrumpeys/…`, and `collections/the-bobs/…`
-   under the origin set as `ARTWORK_BASE_URL` (for example `https://your-domain.example/`).
-2. Simulate `script/DeployArtworkCollections.s.sol` with the escrow owner's `PRIVATE_KEY`, `SWEEPER_ADDRESS`
-   and `ARTWORK_BASE_URL`. After reviewing the simulation, broadcast it to Monad Testnet. It deploys three
-   new collections and verifies them in the existing escrow; it rejects mainnet.
-3. Run `node ops/add-test-collections.mjs --chain-id 10143 --script DeployArtworkCollections.s.sol`, then
-   `make export` to update the collection registry, frontend claim addresses and indexer seeds.
-4. Restart the indexer and rebuild/restart the web app. Connect a wallet on Monad Testnet, claim test NFTs,
-   then use **Create a practice trade**. Each mint requires confirmation in the user's wallet.
+| Network | Chain ID | Use |
+| --- | ---: | --- |
+| Monad Testnet | `10143` | Current wallet configuration and test deployment |
+| Monad | `143` | Recognized by server-side read APIs; not enabled as a wallet network in the current app |
+| Anvil | `31337` | Local contract and end-to-end development only |
 
-The claim addresses are `NEXT_PUBLIC_TEST_R3TARDS_ADDRESS`, `NEXT_PUBLIC_TEST_SKRUMPEYS_ADDRESS` and
-`NEXT_PUBLIC_TEST_BOBS_ADDRESS`. Only addresses from this test deployment should be configured here.
+The checked-in [testnet deployment record](deployments/10143.json) is the source of truth for the deployment currently associated with this repository:
 
-## Setup
+| Contract | Address | Notes |
+| --- | --- | --- |
+| ChogSweeper | [`0xc03F11e7114254F0b3b08E288d0fF496677D5d28`](https://testnet.monadexplorer.com/address/0xc03F11e7114254F0b3b08E288d0fF496677D5d28) | Escrow; deployment block `70087509` |
+| MockChog | [`0xa1E4279a8E6F302F6f9DDb8f57CeDCB71A52f931`](https://testnet.monadexplorer.com/address/0xa1E4279a8E6F302F6f9DDb8f57CeDCB71A52f931) | Freely mintable test contract; deployment block `70087508` |
 
-```sh
-git clone --recursive <repo-url>        # or: git submodule update --init --recursive
-curl -L https://foundry.paradigm.xyz | bash && foundryup
-(cd indexer && npm ci) && (cd web && npm ci) && (cd ops && npm ci)
+The test deployment's configured platform fee is `0.05 MON`. The four Mock partner collections are listed in [`config/verified-collections.json`](config/verified-collections.json). These Mock contracts are test assets and are not the original Chog or Monad collections. The deployment record may differ from a later on-chain owner configuration; verify live values with `make verify-onchain`.
+
+## Test NFTs and artwork
+
+The supplied 30 images are optimized WebP files under `web/public/collections/`:
+
+```text
+web/public/collections/
+├── r3tards/01.webp … 10.webp
+├── skrumpeys/01.webp … 10.webp
+└── the-bobs/01.webp … 10.webp
 ```
 
-Copy `web/.env.example` to `web/.env.local` and fill it in. Never commit a `.env` file; it is git-ignored.
+The Launchpad Overview and the **Test Faucet** show these images as previews. The Test Faucet's mint buttons are for the deployed Mock collections; they do not mint these artworks. The **Test NFTs** tab is wired for three separate replica contracts defined in [`src/TestArtworkCollection.sol`](src/TestArtworkCollection.sol). Once those contracts are deployed and their addresses are configured, each wallet can claim three replicas from each collection once. There is no mint price; the wallet pays Monad Testnet gas. The replicas are for practice only, have no monetary value, and do not use the original collections' contracts.
 
-For the local backend, configure the deployed contract and RPC in `indexer/.env`, then run
-`cd ops && npm run dev:backend`. This starts a persistent local PostgreSQL instance on `127.0.0.1:54329`,
-applies migrations and starts the indexer. It adds `DATABASE_URL` to missing local env configuration;
-existing database settings take precedence. Keep this terminal open, then run `cd web && npm run dev`
-in another terminal. Data stays in `.local/postgres` after shutdown. Redis is optional locally.
+Artwork previews do not imply that the replica contracts are deployed. Minting in the Test NFTs tab remains disabled until the contracts are deployed, registered as tradeable in the escrow, and their addresses are supplied through `NEXT_PUBLIC_TEST_R3TARDS_ADDRESS`, `NEXT_PUBLIC_TEST_SKRUMPEYS_ADDRESS`, and `NEXT_PUBLIC_TEST_BOBS_ADDRESS`. To make NFT images visible in external wallets, the contracts' metadata must point to the public HTTPS origin serving these WebP files.
 
-## Commands
+See [the deployment guide](docs/DEPLOYMENT.md#7b-more-collections-to-test-with-testnet-only) and [`script/DeployArtworkCollections.s.sol`](script/DeployArtworkCollections.s.sol) for the artwork replica process. The deployment script accepts a public `ARTWORK_BASE_URL`, checks that the broadcaster owns the escrow, and refuses chains other than Monad Testnet and Anvil.
 
-- `forge test` runs the contract tests.
-- `cd web && npx vitest run` runs the web tests; `npm run typecheck` type-checks.
-- `make test` runs contracts, indexer and web tests; `make e2e-local` runs the whole stack on a local chain.
-- `make test-js` runs the contract behaviour tests without Foundry (in-process EVM).
-- `make test-ui` drives the real app in a browser against a local chain (fake injected wallet): create, accept, decline, cancel, fee refund, verified-only, expiry. `cd ops/ui-e2e && npm test -- --all` also walks every page at desktop and phone widths.
-- `make dry-run` simulates the deployment against Monad Testnet; `make deploy` broadcasts it (needs `PRIVATE_KEY`).
-- `make smoke-testnet` runs a real trade between two funded wallets.
+## Architecture
+
+```mermaid
+flowchart LR
+  W[Wallet and browser] --> UI[Next.js Launchpad]
+  UI -->|signs transactions and reads contracts| C[Monad Testnet contracts]
+  UI --> API[Next.js API routes]
+  C --> RPC[Monad RPC]
+  RPC --> IDX[Persistent indexer]
+  IDX --> PG[(PostgreSQL)]
+  IDX -. optional inventory cache .-> R[(Upstash Redis)]
+  API -->|swaps, stats, registry| PG
+  API -->|cached inventory, when configured| R
+  IDX -->|resolves token metadata| NFT[HTTPS, IPFS, or Arweave]
+  API -->|safe image proxy| NFT
+```
+
+### Main components
+
+- **Escrow — `src/ChogSweeper.sol`:** trade lifecycle, NFT escrow, MON accounting, platform fee, holder discounts, and verified collection enforcement.
+- **Web app — `web/`:** Next.js 14, React 18, TypeScript, wagmi, and viem. The landing page explains the protocol; `/launchpad` contains the trading workspace.
+- **Indexer — `indexer/`:** a persistent Node.js worker that indexes escrow events and ERC-721 transfers, rebuilds projections, backfills newly registered collections, resolves metadata, and exposes `/healthz`.
+- **Database — `db/migrations/`:** PostgreSQL schema and migrations used by the indexer and server APIs. Redis is an optional wallet-inventory cache.
+- **Operations — `ops/` and `Makefile`:** deployment export, local backend, end-to-end runner, smoke tests, and browser test support.
+
+The indexer keeps separate swap-event and NFT-transfer streams. It stores events with cursors in database transactions, checks block hashes for reorgs, replays from a rewind point when required, and invalidates affected wallet inventory cache entries. Metadata work is retried independently so a slow token URI does not stop event indexing. The web API can fall back to direct chain reads when indexed ownership is incomplete; database-backed history and marketplace statistics need the indexer.
+
+## App routes and API
+
+| Route | Purpose |
+| --- | --- |
+| `/` | Landing page, protocol explanation, ecosystem, and project footer |
+| `/launchpad` | Overview and all trading tools |
+| `/launchpad?tab=new` | Build a direct or public swap; `mode=open` selects a public offer |
+| `/launchpad?tab=requests` | Incoming and outgoing offers |
+| `/launchpad?tab=history` | Completed, cancelled, and declined offers |
+| `/launchpad?tab=public` | Open offers anyone can accept |
+| `/launchpad?tab=collections` | Verified collection registry |
+| `/launchpad?tab=activity` | Marketplace totals and recent activity |
+| `/launchpad?tab=lookup` | Look up an NFT by collection address and token ID |
+| `/launchpad?tab=faucet` | Monad Testnet faucet links, Mock minting, and artwork previews |
+| `/launchpad?tab=test-nfts` | Test artwork replicas; minting depends on deployment configuration |
+| `/swap` | Compatibility redirect to the Launchpad |
+
+The active Launchpad tab is URL state, so a link can be shared or reloaded without losing the selected view.
+
+| API route | Purpose |
+| --- | --- |
+| `GET /api/swaps` | Incoming, outgoing, history, or public offers; cursor-paginated |
+| `GET /api/wallet/inventory` | Wallet NFTs, ownership, metadata, traits, and verified status |
+| `GET /api/inventory` | Backwards-compatible alias for wallet inventory |
+| `GET /api/nft/resolve` | Resolve one collection/token ID to NFT metadata |
+| `GET /api/nft/image` | Stream an NFT image from a supported URI or token reference through the image safety proxy |
+| `GET /api/stats` | Marketplace totals and recent activity from PostgreSQL |
+| `GET /api/collections` | Verified collection registry |
+| `GET /api/status` | RPC and indexer health used by the app status indicator |
+
+Inventory and metadata routes validate input and rate-limit requests. Image and metadata fetches use URI normalization, public-address checks, response limits, and content validation; they do not make arbitrary private network resources available to callers. See [Architecture: metadata and image resolution](docs/ARCHITECTURE.md#nft-metadata-and-image-resolution-what-to-know-when-an-image-does-not-show) for details.
+
+## Repository map
+
+| Path | Contents |
+| --- | --- |
+| `src/` | Escrow, testnet Mock collections, and artwork replica contract |
+| `script/` | Escrow, Mock collection, and artwork replica deployment scripts |
+| `test/` | Foundry unit, fuzz, invariant, and artwork collection tests |
+| `web/` | Next.js pages, components, server APIs, styles, and artwork assets |
+| `indexer/` | Chain streams, database access, metadata resolver, health endpoint, and tests |
+| `db/migrations/` | PostgreSQL schema migrations |
+| `config/` | Seed list of collections shown to the UI and scanned by the indexer |
+| `deployments/` | Exported public deployment details by chain ID |
+| `ops/` | Local backend runner, deployment exporter, smoke tests, and E2E tooling |
+| `docs/` | Detailed architecture and operational deployment guides |
+| `lib/` | Foundry dependencies, checked out as Git submodules |
+
+## Development setup
+
+### Requirements
+
+- Node.js 22 or newer and npm.
+- Foundry (`forge`, `cast`, and `anvil`) for Solidity builds, contract tests, and local-chain E2E.
+- Git submodules for `forge-std` and OpenZeppelin Contracts.
+- Docker only if you choose the Docker Compose backend instead of the embedded local backend.
+
+Clone the repository and install each workspace's dependencies:
+
+```bash
+git clone --recurse-submodules https://github.com/moltaphet/ChogSweeper.git
+cd ChogSweeper
+
+(cd web && npm ci)
+(cd indexer && npm ci)
+(cd ops && npm ci)
+```
+
+If you already cloned without submodules:
+
+```bash
+git submodule update --init --recursive
+```
+
+### Run the web app
+
+Copy the web environment template and set the public Monad Testnet contract values for the deployment you intend to use:
+
+```bash
+cp web/.env.example web/.env.local
+```
+
+At minimum, configure `NEXT_PUBLIC_CHOGSWEEPER_ADDRESS`, `NEXT_PUBLIC_DEPLOY_BLOCK`, and `NEXT_PUBLIC_CHOG_COLLECTION`. These are public client configuration, not secrets. The checked-in deployment data is in `deployments/10143.json`; `make export` can regenerate local web/indexer configuration from deployment artifacts.
+
+```bash
+cd web
+npm run dev
+```
+
+Open `http://localhost:3000`. Without a database and indexer, the UI can still render and perform configured chain reads, but indexer-backed history, stats, and activity are unavailable.
+
+### Run the local backend
+
+Configure the indexer with a deployed escrow, deploy block, and RPC URL:
+
+```bash
+cp indexer/.env.example indexer/.env
+```
+
+Set `SWEEPER_ADDRESS`, `SWEEPER_DEPLOY_BLOCK`, and `RPC_URLS` in `indexer/.env`. To use the included persistent local PostgreSQL runner, set:
+
+```dotenv
+DATABASE_URL=postgres://postgres:chogsweeper-local@127.0.0.1:54329/chogsweeper
+```
+
+Then start the backend in one terminal:
+
+```bash
+cd ops
+npm run dev:backend
+```
+
+This starts PostgreSQL under `.local/postgres`, applies database migrations, builds and starts the indexer, and fills a missing `DATABASE_URL` in the local web environment. It does not deploy contracts or send transactions. Keep it running, then start the web app in another terminal with `cd web && npm run dev`.
+
+To run the full local stack in Docker instead, copy `indexer/.env.example` to the root `.env`, configure its chain variables, and run `docker compose up --build`.
+
+## Tests and checks
+
+```bash
+make test                 # Foundry, indexer, and web test suites
+make test-js              # Contract behavior tests using an in-process EVM
+make e2e-local            # Anvil + PostgreSQL + indexer + web API + smoke flow
+make test-ui              # Browser E2E on a local chain (Playwright/Chromium required)
+```
+
+Individual checks:
+
+```bash
+forge fmt --check
+forge build --sizes
+forge test -vvv
+(cd indexer && npm run typecheck && npm test)
+(cd web && npm run typecheck && npx vitest run)
+```
+
+GitHub Actions runs formatting, build, Solidity tests, indexer type checking/tests, and web type checking/tests on pushes and pull requests. `make e2e-local` uses a local Anvil chain and local database; it does not broadcast to Monad Testnet.
+
+## Deploy to Monad Testnet
+
+The deployment script defaults to chain ID `10143` and rejects a different chain unless `EXPECTED_CHAIN_ID` is deliberately changed. A deployed `MockChog` is allowed only on Monad Testnet or Anvil. Use a throwaway, funded testnet wallet and never commit its private key.
+
+```bash
+cp .env.example .env
+# Set PRIVATE_KEY and review the fee/treasury/collection values in .env.
+make dry-run
+make deploy
+make verify-onchain
+```
+
+`make dry-run` simulates without broadcasting. `make deploy` broadcasts the escrow deployment and exports addresses and ABIs to `deployments/`, `web/lib/generated/`, `indexer/abi/`, and local environment files. Review the simulation and chain ID before broadcasting. For a hosted application, copy the relevant public variables into the hosting provider and redeploy the web app; configure database and indexer secrets on their server-side services.
+
+More detail, including verified collection configuration, source verification, smoke testing, and operating tasks, is in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). For a Railway worker, Supabase PostgreSQL, and Vercel web app setup, see [docs/INDEXER_DEPLOY.md](docs/INDEXER_DEPLOY.md).
+
+### Deploy the artwork replica collections
+
+The image files are served as static assets by the web host. To enable the **Test NFTs** mint flow and wallet metadata:
+
+1. Confirm the public HTTPS URLs for the three `web/public/collections/` folders are live on the deployed web host.
+2. Configure `ARTWORK_BASE_URL` to that public origin, `SWEEPER_ADDRESS` to the testnet escrow, and `PRIVATE_KEY` to the escrow owner. The deploy script checks owner and chain ID.
+3. Simulate, inspect, and then broadcast `script/DeployArtworkCollections.s.sol` on Monad Testnet. It deploys three replica ERC-721 contracts and adds them to the escrow's verified list.
+4. Register the deployment and refresh generated environment values:
+
+   ```bash
+   node ops/add-test-collections.mjs --chain-id 10143 --script DeployArtworkCollections.s.sol
+   make export
+   ```
+
+5. Set `NEXT_PUBLIC_TEST_R3TARDS_ADDRESS`, `NEXT_PUBLIC_TEST_SKRUMPEYS_ADDRESS`, and `NEXT_PUBLIC_TEST_BOBS_ADDRESS` in the web deployment environment and redeploy the web app. Update the indexer collection list and restart the indexer.
+
+Until those addresses are configured, artwork stays visible as a preview but the app does not offer mint transactions for these replicas. This flow deploys separate test contracts; it does not claim, mint, or alter any original collection's NFTs.
+
+## Security and limits
+
+- The smart contracts are **unaudited**. Use test assets and testnet MON only.
+- The escrow accepts only ERC-721 assets from its owner-managed verified list. The list shown by the web/indexer and the on-chain list are separate and must be kept in sync.
+- A verified collection is a trust decision. Malicious or non-standard token contracts can still behave unexpectedly; verify collection bytecode and provenance before adding it.
+- Offers name specific `(collection, tokenId)` pairs. There are no ERC-1155 trades, ERC-2981 royalty payments, or “any token from this collection” offers.
+- Expired offers remain escrowed until the maker cancels. Open public offers can be accepted by any wallet before expiry.
+- Mock contracts are freely mintable test contracts and provide no real collection ownership or value.
+- The protocol currently supports native MON payments only. CHOG is disabled in the UI; enabling it requires a separate ERC-20 settlement and approval implementation.
+- NFT ownership indexing is limited to registered collections. Image availability also depends on the token's metadata URI, public network access, and the configured IPFS/Arweave gateways.
+
+## Further reading
+
+- [Indexing, data flow, API details, metadata resolution, and threat model](docs/ARCHITECTURE.md)
+- [Contract deployment and testnet operations](docs/DEPLOYMENT.md)
+- [Railway, Supabase, and Vercel indexer deployment](docs/INDEXER_DEPLOY.md)
