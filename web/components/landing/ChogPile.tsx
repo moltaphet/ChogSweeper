@@ -202,7 +202,7 @@ export function ChogPile() {
   return (
     <section aria-label="A mix of NFT artwork you can grab and throw" className="relative w-full pb-16">
       <div className="pointer-events-none absolute inset-x-0 top-4 z-10 flex justify-center" aria-hidden>
-        <span className="rounded-full bg-monad-ink px-3.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white shadow-card">Grab and throw the NFTs</span>
+        <span className="rounded-full bg-[#24163D] px-3.5 py-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-white shadow-card">Grab and throw the NFTs</span>
       </div>
       <div ref={box} className="relative h-[clamp(460px,80vh,780px)] w-full touch-pan-y select-none overflow-hidden bg-gradient-to-b from-transparent via-monad-tint/40 to-monad-tint/90">
         {IDS.map((id, i) => (
