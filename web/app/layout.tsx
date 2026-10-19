@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <head>
         <script dangerouslySetInnerHTML={{ __html: `(()=>{try{const t=localStorage.getItem('chogsweeper-theme');const d=t?t==='dark':matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.classList.toggle('dark',d);const m=document.querySelector('meta[name="theme-color"]');if(m)m.content=d?'#100A1D':'#D6CBFF'}catch(e){}})()` }} />
       </head>
-      <body>
+      <body className="flex min-h-svh flex-col">
         <Providers>
           {/* Soft violet atmosphere behind the top of every page. */}
           <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[780px] overflow-hidden [mask-image:linear-gradient(to_bottom,#000_55%,transparent)]" aria-hidden>
