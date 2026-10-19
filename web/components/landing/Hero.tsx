@@ -8,7 +8,7 @@ import { HeroScene } from "./HeroStage";
 
 const CHIPS = [
   { icon: Zap, text: "Sub-second Monad finality" },
-  { icon: ShieldCheck, text: "Atomic escrow, zero counterparty risk" },
+  { icon: ShieldCheck, text: "Atomic escrow, no middleman" },
   { icon: Sparkles, text: "Chog holders trade fee-free" },
 ] as const;
 
