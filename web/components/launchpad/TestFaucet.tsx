@@ -1,7 +1,8 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { Check, ExternalLink, Loader2, Plus, Wallet } from "lucide-react";
+import { Check, ExternalLink, FlaskConical, Loader2, Plus, Wallet } from "lucide-react";
+import Image from "next/image";
 import { useMemo, useState } from "react";
 import { type Address, parseAbi } from "viem";
 import { useBalance, useConnect, usePublicClient, useReadContracts, useSwitchChain, useWriteContract } from "wagmi";
@@ -11,6 +12,7 @@ import { formatMon, shortAddress } from "@/lib/format";
 import { useAccount } from "@/lib/useAccount";
 import { MonTicker } from "../site/MonTicker";
 import { useHub } from "../HubContext";
+import { TEST_COLLECTIONS, testArtwork } from "@/lib/testCollections";
 
 const FAUCET_URL = process.env.NEXT_PUBLIC_FAUCET_URL ?? "https://faucet.monad.xyz";
 const MINT_COUNT = 5n;
@@ -84,6 +86,40 @@ export function TestFaucet() {
         </Step>
 
         <Step n={3} title={`Mint free test NFTs (${MINT_COUNT} per click)`} done={rows.some((r) => (r.balance ?? 0n) > 0n)}>
+          <section className="mb-5 rounded-xl border border-monad-border bg-monad-surface/60 p-3 sm:p-4" aria-labelledby="artwork-preview-title">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h4 id="artwork-preview-title" className="text-sm font-bold text-monad-ink">New collection artwork</h4>
+                  <span className="rounded-full bg-monad-tint px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-monad-deep">Preview</span>
+                </div>
+                <p className="mt-1 text-xs text-monad-muted">All 30 supplied images. Claiming these collections will be enabled after their testnet contracts are deployed.</p>
+              </div>
+              <button type="button" className="btn-ghost !px-3 !py-2 !text-xs" onClick={() => setTab("test-nfts")}>
+                <FlaskConical className="h-3.5 w-3.5" aria-hidden /> Open Test NFTs
+              </button>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              {TEST_COLLECTIONS.map((collection) => (
+                <article key={collection.slug} className="rounded-lg border border-monad-border bg-monad-surface/70 p-2.5">
+                  <h5 className="mb-2 truncate text-xs font-semibold text-monad-ink">{collection.name}</h5>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {Array.from({ length: 10 }, (_, index) => (
+                      <Image
+                        key={index}
+                        src={testArtwork(collection.slug, index + 1)}
+                        alt=""
+                        aria-hidden="true"
+                        width={72}
+                        height={72}
+                        className="aspect-square w-full rounded-md object-cover"
+                      />
+                    ))}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
           {rows.length === 0 ? (
             <p className="text-sm text-monad-muted">{reads.isLoading ? "Loading collections…" : "No mintable test collections are configured on this deployment."}</p>
           ) : (
