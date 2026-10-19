@@ -64,19 +64,17 @@ See [the deployment guide](docs/DEPLOYMENT.md#7b-more-collections-to-test-with-t
 
 ## Architecture
 
-```mermaid
-flowchart LR
-  W[Wallet and browser] --> UI[Next.js Launchpad]
-  UI -->|signs transactions and reads contracts| C[Monad Testnet contracts]
-  UI --> API[Next.js API routes]
-  C --> RPC[Monad RPC]
-  RPC --> IDX[Persistent indexer]
-  IDX --> PG[(PostgreSQL)]
-  IDX -. optional inventory cache .-> R[(Upstash Redis)]
-  API -->|swaps, stats, registry| PG
-  API -->|cached inventory, when configured| R
-  IDX -->|resolves token metadata| NFT[HTTPS, IPFS, or Arweave]
-  API -->|safe image proxy| NFT
+```text
+Wallet / browser
+└── Next.js app
+    ├── Sign transactions and read contracts ──> Monad Testnet
+    └── API routes
+        ├── Swaps, stats, and collections <── PostgreSQL <── Persistent indexer
+        ├── Cached wallet inventory <──────── Redis (optional)
+        └── Safe NFT image proxy ─────────────> HTTPS / IPFS / Arweave
+
+Monad Testnet ──> Monad RPC ──> Persistent indexer ──> PostgreSQL
+                                      └── Metadata resolver ──> HTTPS / IPFS / Arweave
 ```
 
 ### Main components
