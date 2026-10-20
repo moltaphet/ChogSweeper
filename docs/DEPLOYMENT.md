@@ -138,6 +138,21 @@ SEED_MINT_TO=0xYourWallet make test-collections
 
 Deploys four mock partner collections (`MockCollection`: Mock Molandak, Mock Moyaki, Mock Chewy, Mock Mop), mints tokens to `SEED_MINT_TO`, verifies them on the deployed ChogSweeper (the key must be its owner), adds them to `config/verified-collections.json` and re-runs the export. Restart the web app afterwards and, on Vercel, update `NEXT_PUBLIC_COLLECTIONS` from `web/.env.local`.
 
+## 7c. Test artwork replicas (testnet only)
+
+`MockChog` is already a verified, permissionlessly mintable test collection. The three supplied artwork groups use separate replica contracts. Each lets anyone mint 1–10 tokens per transaction and can be called repeatedly; only Monad Testnet and Anvil are allowed.
+
+Set `ARTWORK_BASE_URL` to the public HTTPS origin that serves `collections/r3tards/`, `collections/skrumpeys/`, and `collections/the-bobs/`. Set `SWEEPER_ADDRESS` to the deployed escrow and use the escrow owner's `PRIVATE_KEY`. Then simulate and broadcast the artwork deployment:
+
+```bash
+forge script script/DeployArtworkCollections.s.sol --rpc-url "$MONAD_TESTNET_RPC_URL"
+forge script script/DeployArtworkCollections.s.sol --rpc-url "$MONAD_TESTNET_RPC_URL" --broadcast
+node ops/add-test-collections.mjs --chain-id 10143 --script DeployArtworkCollections.s.sol
+make export
+```
+
+The deployment script adds all three replicas to the escrow's verified list. The export writes their addresses to `web/.env.local`, `deployments/10143.json`, `config/verified-collections.json`, and the generated `web/lib/generated/testCollections.ts`. Commit the deployment record, registry, and generated file so the hosted web build can find the public addresses without manual Vercel variables. Update the hosted indexer's `COLLECTIONS` environment and restart it to backfill the new transfer streams; until then, wallet discovery can read the verified enumerable contracts directly from chain. The Launchpad's **Test NFTs** tab checks the live escrow allowlist before enabling each mint button.
+
 ## 8. Operating notes
 
 * **Change the fee:** owner calls `setPlatformFee(uint128)`. Promotion: `setFeeWaivedUntil(unixTime)`. Capped at 10 MON. Existing trades keep the fee they paid.

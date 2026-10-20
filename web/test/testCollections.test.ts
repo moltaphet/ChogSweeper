@@ -1,10 +1,13 @@
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { SHOWCASE_ART, TEST_COLLECTIONS, testArtwork } from "../lib/testCollections";
+import { SHOWCASE_ART, TEST_COLLECTIONS, TEST_MINT_COLLECTIONS, testArtwork } from "../lib/testCollections";
 import { launchpadHref, parseTab } from "../lib/routes";
 
 describe("test collection artwork", () => {
+  it("provides four separate test mint groups", () => {
+    expect(TEST_MINT_COLLECTIONS.map((c) => c.slug)).toEqual(["chog", "r3tards", "skrumpeys", "the-bobs"]);
+  });
   it("ships every variant and cycles token ids like the test contracts", () => {
     for (const c of TEST_COLLECTIONS) {
       for (let id = 1; id <= 10; id++) expect(existsSync(path.join(process.cwd(), "public", testArtwork(c.slug, id)))).toBe(true);

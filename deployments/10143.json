@@ -1,6 +1,6 @@
 {
   "chainId": 10143,
-  "exportedAt": "2026-10-12T21:23:12.168Z",
+  "exportedAt": "2026-10-20T10:39:18.668Z",
   "deployer": "0x9425CBe19643112Ff7801A805c0de6615Bbc3097",
   "sweeper": {
     "address": "0xc03F11e7114254F0b3b08E288d0fF496677D5d28",
@@ -32,28 +32,56 @@
       "ecosystem": "monad",
       "startBlock": 70502856,
       "name": "Mock Molandak",
-      "mock": false
+      "mock": false,
+      "testArtwork": null
     },
     {
       "address": "0x1f7d461268e5568D09eAe9182429c3F0644E4382",
       "ecosystem": "monad",
       "startBlock": 70502856,
       "name": "Mock Moyaki",
-      "mock": false
+      "mock": false,
+      "testArtwork": null
     },
     {
       "address": "0x34eD3457B063057742a64e83D3a58fC75eF9e12a",
       "ecosystem": "monad",
       "startBlock": 70502856,
       "name": "Mock Chewy",
-      "mock": false
+      "mock": false,
+      "testArtwork": null
     },
     {
       "address": "0x422CC82C81551bebED18Ce2B7204113F1401A386",
       "ecosystem": "monad",
       "startBlock": 70502857,
       "name": "Mock Mop",
-      "mock": false
+      "mock": false,
+      "testArtwork": null
+    },
+    {
+      "address": "0x40fe14F1C25B3a581a4a6E1BF63DfA69CB73a916",
+      "ecosystem": "monad",
+      "startBlock": 72649588,
+      "name": "Test r3tards",
+      "mock": false,
+      "testArtwork": "r3tards"
+    },
+    {
+      "address": "0xE91d0544F7bdF88280Ea1b5FD8299Bf60DF8D058",
+      "ecosystem": "monad",
+      "startBlock": 72649588,
+      "name": "Test skrumpeys",
+      "mock": false,
+      "testArtwork": "skrumpeys"
+    },
+    {
+      "address": "0x49654139A5DF1B2f3AAA49611e9bA269E02859ed",
+      "ecosystem": "monad",
+      "startBlock": 72649589,
+      "name": "Test The Bobs",
+      "mock": false,
+      "testArtwork": "the-bobs"
     }
   ]
 }

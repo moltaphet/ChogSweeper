@@ -16,30 +16,40 @@ contract TestArtworkCollectionTest is Test {
         nft = new TestArtworkCollection("Test The Bobs", "TBOB", "https://assets.example/collections/the-bobs/");
     }
 
-    function test_ClaimMintsThreeEnumerableTokensToCaller() public {
+    function test_MintsRepeatedBatchesAndTracksEnumerableOwnership() public {
         vm.prank(alice);
-        assertEq(nft.claim(), 1);
-        assertEq(nft.balanceOf(alice), 3);
-        assertEq(nft.tokenOfOwnerByIndex(alice, 2), 3);
-        assertTrue(nft.claimed(alice));
+        assertEq(nft.mintBatch(alice, 3), 1);
+        vm.prank(alice);
+        assertEq(nft.mintBatch(alice, 2), 4);
+        assertEq(nft.balanceOf(alice), 5);
+        assertEq(nft.tokenOfOwnerByIndex(alice, 4), 5);
         vm.prank(bob);
-        assertEq(nft.claim(), 4);
-        assertEq(nft.totalSupply(), 6);
+        assertEq(nft.mintBatch(bob, 2), 6);
+        assertEq(nft.totalSupply(), 7);
     }
 
-    function test_TransferringAwayTokensDoesNotResetClaim() public {
+    function test_MintCanBeRepeatedAfterTransferringTokensAway() public {
         vm.startPrank(alice);
-        nft.claim();
+        nft.mintBatch(alice, 3);
         nft.transferFrom(alice, bob, 1);
-        vm.expectRevert(TestArtworkCollection.AlreadyClaimed.selector);
-        nft.claim();
+        assertEq(nft.mintBatch(alice, 2), 4);
+        assertEq(nft.balanceOf(alice), 4);
         vm.stopPrank();
+    }
+
+    function test_RejectsInvalidMintBatchSizes() public {
+        vm.expectRevert(TestArtworkCollection.InvalidBatchSize.selector);
+        nft.mintBatch(alice, 0);
+        vm.expectRevert(TestArtworkCollection.InvalidBatchSize.selector);
+        nft.mintBatch(alice, nft.MAX_BATCH() + 1);
+        vm.expectRevert(TestArtworkCollection.InvalidBatchSize.selector);
+        nft.mintBatch(address(0), 1);
     }
 
     function test_MetadataUsesSuppliedArtworkAndWrapsAfterTen() public {
         for (uint256 i = 1; i <= 4; ++i) {
             vm.prank(address(uint160(i)));
-            nft.claim();
+            nft.mintBatch(address(uint160(i)), 3);
         }
         string memory uri = nft.tokenURI(11);
         bytes memory encoded = bytes(uri);
@@ -68,7 +78,7 @@ contract TestArtworkCollectionTest is Test {
         verified[0] = address(nft);
         sweeper.setVerifiedCollections(verified, true);
         vm.startPrank(alice);
-        nft.claim();
+        nft.mintBatch(alice, 3);
         nft.setApprovalForAll(address(sweeper), true);
         ChogSweeper.Asset[] memory offered = new ChogSweeper.Asset[](1);
         offered[0] = ChogSweeper.Asset(address(nft), 1);

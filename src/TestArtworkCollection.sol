@@ -7,17 +7,16 @@ import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 
 /// @notice Test replicas with supplied sample art, separate from the original NFT collections.
-/// @dev Testnet only. Each wallet can claim three tokens once; artwork cycles through 01.webp..10.webp.
+/// @dev Testnet only. Anyone can mint repeatedly in batches; artwork cycles through 01.webp..10.webp.
 contract TestArtworkCollection is ERC721Enumerable {
     using Strings for uint256;
 
-    uint256 public constant TOKENS_PER_CLAIM = 3;
+    uint256 public constant MAX_BATCH = 10;
     uint256 public nextId = 1;
     string public imageBaseURI;
-    mapping(address wallet => bool) public claimed;
 
     error TestnetOnly();
-    error AlreadyClaimed();
+    error InvalidBatchSize();
     error InvalidImageBaseURI();
 
     constructor(string memory name_, string memory symbol_, string memory imageBaseURI_) ERC721(name_, symbol_) {
@@ -32,14 +31,13 @@ contract TestArtworkCollection is ERC721Enumerable {
         imageBaseURI = imageBaseURI_;
     }
 
-    /// @notice Sends three practice NFTs to the caller; no mint price (only network gas).
-    function claim() external returns (uint256 firstId) {
-        if (claimed[msg.sender]) revert AlreadyClaimed();
-        claimed[msg.sender] = true;
+    /// @notice Mints practice NFTs to `to`; no mint price (only network gas). Repeat as often as desired.
+    function mintBatch(address to, uint256 count) external returns (uint256 firstId) {
+        if (to == address(0) || count == 0 || count > MAX_BATCH) revert InvalidBatchSize();
         firstId = nextId;
-        nextId += TOKENS_PER_CLAIM;
-        for (uint256 i; i < TOKENS_PER_CLAIM; ++i) {
-            _safeMint(msg.sender, firstId + i);
+        nextId += count;
+        for (uint256 i; i < count; ++i) {
+            _safeMint(to, firstId + i);
         }
     }
 

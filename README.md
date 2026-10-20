@@ -42,6 +42,9 @@ The checked-in [testnet deployment record](deployments/10143.json) is the source
 | --- | --- | --- |
 | ChogSweeper | [`0xc03F11e7114254F0b3b08E288d0fF496677D5d28`](https://testnet.monadexplorer.com/address/0xc03F11e7114254F0b3b08E288d0fF496677D5d28) | Escrow; deployment block `70087509` |
 | MockChog | [`0xa1E4279a8E6F302F6f9DDb8f57CeDCB71A52f931`](https://testnet.monadexplorer.com/address/0xa1E4279a8E6F302F6f9DDb8f57CeDCB71A52f931) | Freely mintable test contract; deployment block `70087508` |
+| Test r3tards | [`0x40fe14F1C25B3a581a4a6E1BF63DfA69CB73a916`](https://testnet.monadexplorer.com/address/0x40fe14F1C25B3a581a4a6E1BF63DfA69CB73a916) | Verified artwork replica; deployment block `72649588` |
+| Test skrumpeys | [`0xE91d0544F7bdF88280Ea1b5FD8299Bf60DF8D058`](https://testnet.monadexplorer.com/address/0xE91d0544F7bdF88280Ea1b5FD8299Bf60DF8D058) | Verified artwork replica; deployment block `72649588` |
+| Test The Bobs | [`0x49654139A5DF1B2f3AAA49611e9bA269E02859ed`](https://testnet.monadexplorer.com/address/0x49654139A5DF1B2f3AAA49611e9bA269E02859ed) | Verified artwork replica; deployment block `72649589` |
 
 The test deployment's configured platform fee is `0.05 MON`. The four Mock partner collections are listed in [`config/verified-collections.json`](config/verified-collections.json). These Mock contracts are test assets and are not the original Chog or Monad collections. The deployment record may differ from a later on-chain owner configuration; verify live values with `make verify-onchain`.
 
@@ -56,9 +59,9 @@ web/public/collections/
 └── the-bobs/01.webp … 10.webp
 ```
 
-The Launchpad Overview and the **Test Faucet** show these images as previews. The Test Faucet's mint buttons are for the deployed Mock collections; they do not mint these artworks. The **Test NFTs** tab is wired for three separate replica contracts defined in [`src/TestArtworkCollection.sol`](src/TestArtworkCollection.sol). Once those contracts are deployed and their addresses are configured, each wallet can claim three replicas from each collection once. There is no mint price; the wallet pays Monad Testnet gas. The replicas are for practice only, have no monetary value, and do not use the original collections' contracts.
+The **Test NFTs** tab brings the four sample groups together: the existing, verified testnet `MockChog` plus test replicas for r3tards, skrumpeys, and The Bobs. Each replica contract is permissionlessly mintable in batches of up to 10 per transaction, with no lifetime wallet limit; users can mint another batch whenever they need more. There is no mint price; the wallet pays Monad Testnet gas. These test tokens have no monetary value and the three artwork replicas do not use the original collections' contracts.
 
-Artwork previews do not imply that the replica contracts are deployed. Minting in the Test NFTs tab remains disabled until the contracts are deployed, registered as tradeable in the escrow, and their addresses are supplied through `NEXT_PUBLIC_TEST_R3TARDS_ADDRESS`, `NEXT_PUBLIC_TEST_SKRUMPEYS_ADDRESS`, and `NEXT_PUBLIC_TEST_BOBS_ADDRESS`. To make NFT images visible in external wallets, the contracts' metadata must point to the public HTTPS origin serving these WebP files.
+All four test collections are deployed and verified on Monad Testnet. Their public addresses are recorded in [`deployments/10143.json`](deployments/10143.json) and generated into [`web/lib/generated/testCollections.ts`](web/lib/generated/testCollections.ts), so a fresh web build can discover them without manually adding hosting variables. The deployment export also fills the `NEXT_PUBLIC_TEST_*_ADDRESS` values in local environment files. To show replica images in external wallets, their on-chain metadata points to the public HTTPS origin serving these WebP files.
 
 See [the deployment guide](docs/DEPLOYMENT.md#7b-more-collections-to-test-with-testnet-only) and [`script/DeployArtworkCollections.s.sol`](script/DeployArtworkCollections.s.sol) for the artwork replica process. The deployment script accepts a public `ARTWORK_BASE_URL`, checks that the broadcaster owns the escrow, and refuses chains other than Monad Testnet and Anvil.
 
@@ -256,7 +259,7 @@ The image files are served as static assets by the web host. To enable the **Tes
 
 5. Set `NEXT_PUBLIC_TEST_R3TARDS_ADDRESS`, `NEXT_PUBLIC_TEST_SKRUMPEYS_ADDRESS`, and `NEXT_PUBLIC_TEST_BOBS_ADDRESS` in the web deployment environment and redeploy the web app. Update the indexer collection list and restart the indexer.
 
-Until those addresses are configured, artwork stays visible as a preview but the app does not offer mint transactions for these replicas. This flow deploys separate test contracts; it does not claim, mint, or alter any original collection's NFTs.
+Running the export registers the deployed addresses for the web app and indexer. This flow deploys separate test contracts; it does not claim, mint, or alter any original collection's NFTs.
 
 ## Security and limits
 

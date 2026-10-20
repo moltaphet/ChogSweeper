@@ -1,5 +1,6 @@
 import { isAddress } from "viem";
 import { CHOG_COLLECTION } from "../config";
+import { DEPLOYED_TEST_COLLECTIONS } from "../generated/testCollections";
 import { markDbFailure } from "./db";
 import type { Queryable } from "./queryable";
 import { INDEXER_CHAIN_ID } from "./chains";
@@ -34,6 +35,14 @@ export function registryFromEnv(env: Record<string, string | undefined> = proces
   }
   const chog = env.NEXT_PUBLIC_CHOG_COLLECTION ?? CHOG_COLLECTION ?? undefined;
   if (chog) add(chog, "chog");
+  // These are testnet-only deployments exported from deployments/10143.json. Keep wallet discovery and
+  // the live allowlist-aware UI working even when a hosting provider has not copied fresh env values yet.
+  if (INDEXER_CHAIN_ID === 10143) {
+    if (DEPLOYED_TEST_COLLECTIONS.chog) add(DEPLOYED_TEST_COLLECTIONS.chog, "chog", undefined, "Mock Chog");
+    if (DEPLOYED_TEST_COLLECTIONS.r3tards) add(DEPLOYED_TEST_COLLECTIONS.r3tards, "monad", undefined, "Test r3tards");
+    if (DEPLOYED_TEST_COLLECTIONS.skrumpeys) add(DEPLOYED_TEST_COLLECTIONS.skrumpeys, "monad", undefined, "Test skrumpeys");
+    if (DEPLOYED_TEST_COLLECTIONS.theBobs) add(DEPLOYED_TEST_COLLECTIONS.theBobs, "monad", undefined, "Test The Bobs");
+  }
   return out;
 }
 

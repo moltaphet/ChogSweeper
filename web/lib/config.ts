@@ -1,4 +1,5 @@
 import { defineChain, isAddress, type Address } from "viem";
+import { DEPLOYED_TEST_COLLECTIONS } from "./generated/testCollections";
 
 export const monadTestnet = defineChain({
   id: 10143,
@@ -23,9 +24,13 @@ export const DEPLOY_BLOCK = BigInt(process.env.NEXT_PUBLIC_DEPLOY_BLOCK ?? "0");
 /** Chog collection, listed before all others. */
 export const CHOG_COLLECTION = asAddress(process.env.NEXT_PUBLIC_CHOG_COLLECTION);
 /** Extra collections to scan, comma separated. */
-export const DEFAULT_COLLECTIONS: Address[] = (process.env.NEXT_PUBLIC_COLLECTIONS ?? "")
+const exportedTestCollections = Object.values(DEPLOYED_TEST_COLLECTIONS).filter((s) => isAddress(s)) as Address[];
+export const DEFAULT_COLLECTIONS: Address[] = [...new Set([
+  ...exportedTestCollections,
+  ...(process.env.NEXT_PUBLIC_COLLECTIONS ?? "")
   .split(",")
   .map((s) => s.trim())
-  .filter((s): s is Address => isAddress(s));
+  .filter((s): s is Address => isAddress(s)),
+].map((s) => s.toLowerCase()))] as Address[];
 
 export const IPFS_GATEWAY = process.env.NEXT_PUBLIC_IPFS_GATEWAY ?? "https://ipfs.io/ipfs/";

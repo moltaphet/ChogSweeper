@@ -93,7 +93,7 @@ export function TestFaucet() {
                   <h4 id="artwork-preview-title" className="text-sm font-bold text-monad-ink">New collection artwork</h4>
                   <span className="rounded-full bg-monad-tint px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-monad-deep">Preview</span>
                 </div>
-                <p className="mt-1 text-xs text-monad-muted">All 30 supplied images. Claiming these collections will be enabled after their testnet contracts are deployed.</p>
+                <p className="mt-1 text-xs text-monad-muted">All 30 supplied images. Use Test NFTs to choose 1–10 per transaction and mint again whenever you need more. The quick-mint buttons below add 5 per click.</p>
               </div>
               <button type="button" className="btn-ghost !px-3 !py-2 !text-xs" onClick={() => setTab("test-nfts")}>
                 <FlaskConical className="h-3.5 w-3.5" aria-hidden /> Open Test NFTs
