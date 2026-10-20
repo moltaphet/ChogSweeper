@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HOW_IT_WORKS_HREF, parseMode, parseTab, launchpadHref, TABS, withState } from "../lib/routes";
+import { NAV } from "../lib/site";
 
 describe("route helpers", () => {
   it("parses the tab, falling back to the default on anything unexpected", () => {
@@ -27,6 +28,10 @@ describe("route helpers", () => {
   it("the Requests link used by the navbar is exactly /launchpad?tab=requests", () => {
     expect(launchpadHref("requests")).toBe("/launchpad?tab=requests");
     expect(HOW_IT_WORKS_HREF).toBe("/#how-it-works");
+  });
+
+  it("exposes public offers in the primary navigation as a shareable page", () => {
+    expect(NAV.find((item) => item.key === "public-trades")?.href).toBe("/launchpad?tab=public");
   });
 
   it("updates the tab or mode in a query string and keeps unrelated parameters", () => {

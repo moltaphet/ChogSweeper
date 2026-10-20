@@ -12,6 +12,7 @@ The repository contains the escrow contract, a Next.js application, a Monad even
 
 - Create direct or public offers with up to 10 ERC-721 tokens per side, native MON, or both.
 - Browse incoming requests, outgoing offers, public trades, transaction history, collections, and recent activity.
+- Share the public-market link directly: visitors can browse open trades without connecting a wallet; connecting is only needed to accept one.
 - Load wallet NFTs, resolve token metadata, and preview trade assets before signing.
 - Show a confirmed on-chain receipt after swaps, NFT approvals, offer actions, and test mints, including the transaction hash, block, gas, and explorer link.
 - Require each collection to be on the escrow contract's verified list before it can be offered or requested.
@@ -93,7 +94,7 @@ Monad Testnet ──> Monad RPC ──> Persistent indexer ──> PostgreSQL
 - **Database — `db/migrations/`:** PostgreSQL schema and migrations used by the indexer and server APIs. Redis is an optional wallet-inventory cache.
 - **Operations — `ops/` and `Makefile`:** deployment export, local backend, end-to-end runner, smoke tests, and browser test support.
 
-The indexer keeps separate swap-event and NFT-transfer streams. It stores events with cursors in database transactions, checks block hashes for reorgs, replays from a rewind point when required, and invalidates affected wallet inventory cache entries. Metadata work is retried independently so a slow token URI does not stop event indexing. The web API can fall back to direct chain reads when indexed ownership is incomplete; database-backed history and marketplace statistics need the indexer.
+The indexer keeps separate swap-event and NFT-transfer streams. It stores events with cursors in database transactions, checks block hashes for reorgs, replays from a rewind point when required, and invalidates affected wallet inventory cache entries. Metadata work is retried independently so a slow token URI does not stop event indexing. The web API can fall back to direct chain reads when indexed ownership is incomplete. The Public Trades view also merges recent on-chain offers with indexed records, so a reachable but lagging indexer does not hide newly posted offers. Database-backed history and marketplace statistics still need the indexer.
 
 ## App routes and API
 
@@ -184,7 +185,7 @@ cd web
 npm run dev
 ```
 
-Open `http://localhost:3000`. Without a database and indexer, the UI can still render and perform configured chain reads, but indexer-backed history, stats, and activity are unavailable.
+Open `http://localhost:3000`. Use **Public Trades** in the main navigation or share `/launchpad?tab=public` so visitors can inspect open offers; they only need a connected wallet to accept. Recent public offers can still load from Monad Testnet when the indexer is unavailable, but Activity totals and full history remain indexer-backed.
 
 ### Run the local backend
 
@@ -230,7 +231,7 @@ forge test -vvv
 (cd web && npm run typecheck && npx vitest run)
 ```
 
-GitHub Actions runs formatting, build, Solidity tests, indexer type checking/tests, and web type checking/tests on pushes and pull requests. `make e2e-local` uses a local Anvil chain and local database; it does not broadcast to Monad Testnet.
+GitHub Actions runs formatting, Solidity build and tests, indexer type checking/tests, and web type checking, tests, and production build on pushes and pull requests. `make e2e-local` uses a local Anvil chain and local database; it does not broadcast to Monad Testnet.
 
 ## Deploy to Monad Testnet
 

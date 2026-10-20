@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fromApiSwap } from "../lib/api";
+import { mergePublicTrades } from "../lib/chainTrades";
 import { ZERO_ADDRESS } from "../lib/config";
 import { formatMon, parseMon } from "../lib/format";
 import { expiryLabel, formatDuration } from "../lib/time";
@@ -50,6 +51,25 @@ describe("fromApiSwap", () => {
     expect(t.expiry).toBe(1_893_456_000);
     expect(t.feePaid).toBe(250n);
     expect(t.offered[0]).toMatchObject({ tokenId: 7n, verified: true, ecosystem: "chog", isChog: true });
+  });
+});
+
+describe("mergePublicTrades", () => {
+  it("adds a new chain offer missing from a stale indexer, keeps indexed metadata, and sorts newest first", () => {
+    const indexed = trade(4, { taker: ZERO_ADDRESS, createdTx: "0xold", offered: [{ contract: THIRD, tokenId: 4n, name: "Indexed NFT" }] });
+    const stale = trade(4, { taker: ZERO_ADDRESS, createdTx: "0xchain", offered: [{ contract: THIRD, tokenId: 4n }] });
+    const fresh = trade(5, { taker: ZERO_ADDRESS, createdTx: "0xnew" });
+    const result = mergePublicTrades([indexed], [stale, fresh], 1_000);
+    expect(result.map((x) => x.id)).toEqual([5n, 4n]);
+    expect(result[1]).toMatchObject({ createdTx: "0xold", offered: [{ name: "Indexed NFT" }] });
+  });
+
+  it("uses chain status to hide offers accepted, cancelled, expired or past their deadline", () => {
+    const indexedOpen = trade(4, { taker: ZERO_ADDRESS });
+    const accepted = trade(4, { status: "completed", taker: THIRD });
+    const direct = trade(5, { taker: THIRD });
+    const expired = trade(6, { taker: ZERO_ADDRESS, expiry: 999 });
+    expect(mergePublicTrades([indexedOpen], [accepted, direct, expired], 1_000)).toEqual([]);
   });
 });
 

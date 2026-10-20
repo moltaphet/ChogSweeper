@@ -2,7 +2,7 @@
 
 import { Menu, Rocket, X } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { LAUNCHPAD_PATH } from "@/lib/routes";
 import { NAV, type NavKey } from "@/lib/site";
@@ -44,6 +44,7 @@ const LANDING_SECTIONS = ["how-it-works", "ecosystem"] as const;
  */
 export function Navbar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const inApp = pathname.startsWith(LAUNCHPAD_PATH);
   const { unread } = useUnread();
   const section = useSectionInView(LANDING_SECTIONS, !inApp);
@@ -58,7 +59,9 @@ export function Navbar() {
   }, []);
   useEffect(() => setMenu(false), [pathname]);
 
-  const active: NavKey | null = inApp ? "launchpad" : section === "how-it-works" ? "how" : section === "ecosystem" ? "ecosystem" : null;
+  const active: NavKey | null = inApp
+    ? searchParams.get("tab") === "public" ? "public-trades" : "launchpad"
+    : section === "how-it-works" ? "how" : section === "ecosystem" ? "ecosystem" : null;
 
   return (
     <header className={`sticky top-0 z-40 transition duration-300 ${scrolled || menu || inApp ? "border-b border-monad-border/70 bg-white/75 shadow-[0_8px_30px_-18px_rgba(94,67,243,0.35)] backdrop-blur-xl" : "border-b border-transparent bg-transparent"}`}>

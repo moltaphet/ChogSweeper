@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowRight, BookOpen, ShieldCheck, Sparkles, Zap } from "lucide-react";
+import { ArrowRight, BookOpen, Globe, ShieldCheck, Sparkles, Zap } from "lucide-react";
 import Link from "next/link";
-import { LAUNCHPAD_PATH } from "@/lib/routes";
+import { LAUNCHPAD_PATH, launchpadHref } from "@/lib/routes";
 import { LiveDot, useLiveLook } from "../site/LiveDot";
 import { HeroScene } from "./HeroStage";
 
@@ -68,6 +68,9 @@ export function Hero() {
               <a href="#how-it-works" className="inline-flex items-center gap-2 rounded-2xl border border-white/20 bg-white/10 px-6 py-4 text-base font-semibold text-white backdrop-blur transition duration-200 hover:border-white/40 hover:bg-white/15">
                 <BookOpen className="h-4 w-4" aria-hidden /> How it works
               </a>
+              <Link href={launchpadHref("public")} className="inline-flex items-center gap-2 rounded-2xl border border-white/20 px-5 py-4 text-base font-semibold text-white/80 transition duration-200 hover:border-white/40 hover:bg-white/10 hover:text-white">
+                <Globe className="h-4 w-4" aria-hidden /> Browse open trades
+              </Link>
             </div>
 
             <ul className="mt-9 flex flex-col gap-2.5 sm:flex-row sm:flex-wrap" aria-label="Highlights">

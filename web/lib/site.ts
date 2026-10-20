@@ -12,7 +12,7 @@ export const LINKS = {
   contract: SWEEPER_ADDRESS ? `${monadTestnet.blockExplorers.default.url}/address/${SWEEPER_ADDRESS}` : null,
 } as const;
 
-export type NavKey = "launchpad" | "how" | "ecosystem" | "contract";
+export type NavKey = "launchpad" | "public-trades" | "how" | "ecosystem" | "contract";
 
 export interface NavItem {
   key: NavKey;
@@ -29,6 +29,7 @@ export interface NavItem {
 /** The navbar, same on every route. Every tool lives in the Launchpad (its badge counts unread requests). "Contract Explorer" points at the deployed contract once there is one, otherwise at the explorer home. */
 export const NAV: readonly NavItem[] = [
   { key: "launchpad", label: "Launchpad", href: launchpadHref(), badge: true },
+  { key: "public-trades", label: "Public Trades", href: launchpadHref("public"), title: "Browse open trades anyone can accept" },
   { key: "how", label: "How It Works", href: HOW_IT_WORKS_HREF },
   { key: "ecosystem", label: "Ecosystem", href: "/#ecosystem" },
   {
