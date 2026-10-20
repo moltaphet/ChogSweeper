@@ -1,6 +1,7 @@
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { LAUNCHPAD_PATH } from "@/lib/routes";
+import { ChogCard } from "./ChogCard";
 import { NftCard } from "./NftCard";
 
 /** The closing call to action: the hero's dark stage again, so the page starts and ends on the same note. */
@@ -13,10 +14,11 @@ export function CtaBand() {
           <div className="absolute bottom-[-40%] right-[5%] h-[70%] w-[45%] animate-aurora rounded-full bg-[radial-gradient(closest-side,rgba(236,72,153,0.45),transparent)] blur-3xl [animation-delay:-6s]" />
         </div>
 
-        <div className="mx-auto mb-8 flex max-w-xs items-end justify-center gap-3" aria-hidden>
-          <NftCard id={21} slot={1} className="w-24 -rotate-6 sm:w-28" />
-          <NftCard id={7} slot={2} className="mb-4 w-28 sm:w-32" />
-          <NftCard id={42} slot={7} className="w-24 rotate-6 sm:w-28" />
+        <div className="mx-auto mb-8 flex max-w-md items-end justify-center gap-2 sm:gap-3" aria-hidden>
+          <NftCard id={21} slot={1} className="w-16 -rotate-6 sm:w-24" />
+          <NftCard id={7} slot={2} className="mb-3 w-16 -rotate-3 sm:mb-4 sm:w-24" />
+          <ChogCard id={1} slot={0} className="z-10 mb-5 w-20 sm:mb-6 sm:w-28" />
+          <NftCard id={42} slot={7} className="w-16 rotate-6 sm:w-24" />
         </div>
 
         <h2 id="cta-title" className="font-display text-3xl font-extrabold tracking-tight text-white sm:text-5xl">Ready to swap your Chogs?</h2>
