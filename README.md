@@ -28,7 +28,9 @@ The fee is paid by the maker, not the taker. Chog holders are exempt under the c
 
 **MON is the only payment currency implemented in the contract.** The trade builder displays CHOG as a disabled, mainnet-planned option. It cannot be selected or transferred. CHOG payment support would require ERC-20 settlement and approvals in the contract before it could be enabled. Chog NFTs and the planned CHOG payment token are separate things.
 
-## Network and current test deployment
+## Monad Testnet contracts
+
+### Supported networks
 
 | Network | Chain ID | Use |
 | --- | ---: | --- |
@@ -36,7 +38,9 @@ The fee is paid by the maker, not the taker. Chog holders are exempt under the c
 | Monad | `143` | Recognized by server-side read APIs; not enabled as a wallet network in the current app |
 | Anvil | `31337` | Local contract and end-to-end development only |
 
-The checked-in [testnet deployment record](deployments/10143.json) is the source of truth for the deployment currently associated with this repository:
+### Deployed contracts
+
+These are the contracts currently deployed for this project on Monad Testnet (`10143`). Use the explorer links to inspect them on-chain. The [deployment record](deployments/10143.json) is the source of truth for these addresses.
 
 | Contract | Address | Notes |
 | --- | --- | --- |
@@ -243,23 +247,18 @@ make verify-onchain
 
 More detail, including verified collection configuration, source verification, smoke testing, and operating tasks, is in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). For a Railway worker, Supabase PostgreSQL, and Vercel web app setup, see [docs/INDEXER_DEPLOY.md](docs/INDEXER_DEPLOY.md).
 
-### Deploy the artwork replica collections
+### Re-deploy the artwork replica collections
 
-The image files are served as static assets by the web host. To enable the **Test NFTs** mint flow and wallet metadata:
+The three artwork replica contracts listed above are already deployed, registered in the escrow's verified collection list, and included in the generated web configuration. This procedure is only needed when creating a **new** test deployment; it is not required to enable the current Test NFTs flow.
 
-1. Confirm the public HTTPS URLs for the three `web/public/collections/` folders are live on the deployed web host.
-2. Configure `ARTWORK_BASE_URL` to that public origin, `SWEEPER_ADDRESS` to the testnet escrow, and `PRIVATE_KEY` to the escrow owner. The deploy script checks owner and chain ID.
-3. Simulate, inspect, and then broadcast `script/DeployArtworkCollections.s.sol` on Monad Testnet. It deploys three replica ERC-721 contracts and adds them to the escrow's verified list.
-4. Register the deployment and refresh generated environment values:
+For a new deployment, serve the image files under `web/public/collections/` from a public HTTPS origin, set `ARTWORK_BASE_URL`, `SWEEPER_ADDRESS`, and the escrow owner's `PRIVATE_KEY`, then simulate and broadcast [`script/DeployArtworkCollections.s.sol`](script/DeployArtworkCollections.s.sol) on Monad Testnet. Register the resulting addresses and regenerate app configuration with:
 
-   ```bash
-   node ops/add-test-collections.mjs --chain-id 10143 --script DeployArtworkCollections.s.sol
-   make export
-   ```
+```bash
+node ops/add-test-collections.mjs --chain-id 10143 --script DeployArtworkCollections.s.sol
+make export
+```
 
-5. Set `NEXT_PUBLIC_TEST_R3TARDS_ADDRESS`, `NEXT_PUBLIC_TEST_SKRUMPEYS_ADDRESS`, and `NEXT_PUBLIC_TEST_BOBS_ADDRESS` in the web deployment environment and redeploy the web app. Update the indexer collection list and restart the indexer.
-
-Running the export registers the deployed addresses for the web app and indexer. This flow deploys separate test contracts; it does not claim, mint, or alter any original collection's NFTs.
+The script deploys separate test ERC-721 replicas; it does not claim, mint, or alter NFTs from the original collections. See [the deployment guide](docs/DEPLOYMENT.md#7b-more-collections-to-test-with-testnet-only) for the full procedure.
 
 ## Security and limits
 
