@@ -18,8 +18,18 @@ export function createPgDb(connectionString: string): Db {
   // default trust store. Supplying it keeps TLS verification enabled instead
   // of weakening the connection with rejectUnauthorized: false.
   const ca = process.env.DATABASE_SSL_CA?.replace(/\\n/g, "\n").trim();
+  let resolvedConnectionString = connectionString;
+  if (ca) {
+    // node-postgres merges parameters parsed from connectionString after the
+    // explicit config, so sslmode=require would otherwise replace `ssl.ca`.
+    const url = new URL(connectionString);
+    for (const key of ["ssl", "sslmode", "sslrootcert", "sslcert", "sslkey"]) {
+      url.searchParams.delete(key);
+    }
+    resolvedConnectionString = url.toString();
+  }
   const pool = new pg.Pool({
-    connectionString,
+    connectionString: resolvedConnectionString,
     ...(ca ? { ssl: { ca, rejectUnauthorized: true } } : {}),
     max: 5,
     idleTimeoutMillis: 30_000,
