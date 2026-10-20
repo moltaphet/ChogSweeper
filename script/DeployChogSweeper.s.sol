@@ -82,7 +82,9 @@ contract DeployChogSweeper is Script {
         c.deployMock = vm.envOr("DEPLOY_MOCK_CHOG", c.chog == address(0));
 
         // A faucet-style mint contract has no business anywhere but a test network.
-        if (c.deployMock && block.chainid != MONAD_TESTNET && block.chainid != ANVIL) revert MockNotAllowedHere(block.chainid);
+        if (c.deployMock && block.chainid != MONAD_TESTNET && block.chainid != ANVIL) {
+            revert MockNotAllowedHere(block.chainid);
+        }
     }
 
     /// @dev Deploys MockChog and mints the optional seed tokens (SEED_MINT_TO / SEED_MINT_COUNT).

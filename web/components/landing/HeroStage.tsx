@@ -6,10 +6,10 @@ import { NftCard } from "./NftCard";
 /** Where each card sits in the fan. x/y are percentages of the scene; px/py are how far the mouse moves it (depth). */
 const CARDS = [
   { id: 88, slot: 5, x: 0, y: 34, w: 150, r: -14, px: -8, py: -4, ry: 10, z: 1, dur: 8.5, fy: -10 },
-  { id: 3, slot: 0, x: 74, y: 30, w: 150, r: 13, px: -8, py: -4, ry: -10, z: 1, dur: 9.5, fy: -12 },
-  { id: 21, slot: 2, x: 10, y: 50, w: 190, r: -7, px: 14, py: 7, ry: 12, z: 2, dur: 7, fy: -14 },
+  { id: 3, slot: 2, x: 74, y: 30, w: 150, r: 13, px: -8, py: -4, ry: -10, z: 1, dur: 9.5, fy: -12 },
+  { id: 21, slot: 6, x: 10, y: 50, w: 190, r: -7, px: 14, py: 7, ry: 12, z: 2, dur: 7, fy: -14 },
   { id: 42, slot: 7, x: 56, y: 48, w: 190, r: 7, px: 14, py: 7, ry: -12, z: 2, dur: 7.8, fy: -16 },
-  { id: 7, slot: 2, x: 33, y: 5, w: 236, r: 0, px: 26, py: 14, ry: 8, z: 3, dur: 6.5, fy: -18 },
+  { id: 7, slot: 4, x: 33, y: 5, w: 236, r: 0, px: 26, py: 14, ry: 8, z: 3, dur: 6.5, fy: -18 },
 ] as const;
 
 const SPARKS = Array.from({ length: 22 }, (_, i) => ({
