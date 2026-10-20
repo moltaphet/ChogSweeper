@@ -101,7 +101,9 @@ contract MockChogTest is Test {
     function _decode(string memory b64) private pure returns (bytes memory out) {
         bytes memory data = bytes(b64);
         bytes memory table = bytes("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/");
-        uint256 pad = data.length > 0 && data[data.length - 1] == "=" ? (data.length > 1 && data[data.length - 2] == "=" ? 2 : 1) : 0;
+        uint256 pad = data.length > 0 && data[data.length - 1] == "="
+            ? (data.length > 1 && data[data.length - 2] == "=" ? 2 : 1)
+            : 0;
         out = new bytes(data.length / 4 * 3 - pad);
         uint256 o;
         for (uint256 i; i < data.length; i += 4) {
@@ -130,7 +132,9 @@ contract MockChogTest is Test {
     function _slice(string memory s, uint256 start, uint256 len) private pure returns (string memory) {
         bytes memory b = bytes(s);
         bytes memory r = new bytes(len);
-        for (uint256 i; i < len; ++i) r[i] = b[start + i];
+        for (uint256 i; i < len; ++i) {
+            r[i] = b[start + i];
+        }
         return string(r);
     }
 
