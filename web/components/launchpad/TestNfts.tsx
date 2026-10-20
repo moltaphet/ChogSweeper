@@ -11,6 +11,7 @@ import { sweeperAbi } from "@/lib/abi";
 import { confirmTx } from "@/lib/confirm";
 import { DEFAULT_TEST_MINT_COUNT, TEST_MINT_COLLECTIONS, testNftAbi } from "@/lib/testCollections";
 import { useHub } from "../HubContext";
+import { useTransactionReceipts } from "../TransactionReceipts";
 
 export function TestNfts() {
   const { address, isConnected, chainId } = useAccount();
@@ -19,6 +20,7 @@ export function TestNfts() {
   const { switchChain } = useSwitchChain();
   const queryClient = useQueryClient();
   const { startSwap } = useHub();
+  const showReceipt = useTransactionReceipts();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hash, setHash] = useState<string | null>(null);
@@ -61,7 +63,9 @@ export function TestNfts() {
         throw new Error("This test collection is not enabled for trading yet.");
       }
       const tx = await writeContractAsync({ address: collectionAddress, abi: testNftAbi, functionName: "mintBatch", args: [address, count], chainId: monadTestnet.id });
-      await confirmTx(client, tx);
+      const receipt = await confirmTx(client, tx);
+      const collectionName = TEST_MINT_COLLECTIONS.find((c) => c.slug === slug)?.name ?? "test collection";
+      showReceipt({ title: "Test NFTs minted", summary: `${count.toString()} ${collectionName} NFT${count === 1n ? "" : "s"} minted to your wallet.`, receipt });
       setHash(tx);
       await state.refetch();
       await queryClient.invalidateQueries({ queryKey: ["wallet-nfts"] });

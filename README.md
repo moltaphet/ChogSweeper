@@ -13,6 +13,7 @@ The repository contains the escrow contract, a Next.js application, a Monad even
 - Create direct or public offers with up to 10 ERC-721 tokens per side, native MON, or both.
 - Browse incoming requests, outgoing offers, public trades, transaction history, collections, and recent activity.
 - Load wallet NFTs, resolve token metadata, and preview trade assets before signing.
+- Show a confirmed on-chain receipt after swaps, NFT approvals, offer actions, and test mints, including the transaction hash, block, gas, and explorer link.
 - Require each collection to be on the escrow contract's verified list before it can be offered or requested.
 - Refund the maker's platform fee when a trade is cancelled or declined; retain it only after acceptance.
 - Run a test faucet flow for Monad Testnet mock collections and show artwork previews for **r3tards**, **skrumpeys**, and **The Bobs**.
@@ -108,7 +109,7 @@ The indexer keeps separate swap-event and NFT-transfer streams. It stores events
 | `/launchpad?tab=activity` | Marketplace totals and recent activity |
 | `/launchpad?tab=lookup` | Look up an NFT by collection address and token ID |
 | `/launchpad?tab=faucet` | Monad Testnet faucet links, Mock minting, and artwork previews |
-| `/launchpad?tab=test-nfts` | Test artwork replicas; minting depends on deployment configuration |
+| `/launchpad?tab=test-nfts` | Mint the four verified Monad Testnet test collections (Mock Chog, r3tards, skrumpeys, and The Bobs) |
 | `/swap` | Compatibility redirect to the Launchpad |
 
 The active Launchpad tab is URL state, so a link can be shared or reloaded without losing the selected view.
@@ -124,7 +125,7 @@ The active Launchpad tab is URL state, so a link can be shared or reloaded witho
 | `GET /api/collections` | Verified collection registry |
 | `GET /api/status` | RPC and indexer health used by the app status indicator |
 
-Inventory and metadata routes validate input and rate-limit requests. Image and metadata fetches use URI normalization, public-address checks, response limits, and content validation; they do not make arbitrary private network resources available to callers. See [Architecture: metadata and image resolution](docs/ARCHITECTURE.md#nft-metadata-and-image-resolution-what-to-know-when-an-image-does-not-show) for details.
+Inventory and metadata routes validate input and rate-limit requests. Image and metadata fetches use URI normalization, public-address checks, pin each validated DNS result to its socket (including each redirect), enforce response limits, and validate content; they do not make arbitrary private network resources available to callers. See [Architecture: metadata and image resolution](docs/ARCHITECTURE.md#nft-metadata-and-image-resolution-what-to-know-when-an-image-does-not-show) for details.
 
 ## Repository map
 

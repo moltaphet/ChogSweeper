@@ -19,6 +19,7 @@ import { AddTokenForm } from "./AddTokenForm";
 import { EmptyState } from "./EmptyState";
 import { useHub, type OfferMode } from "./HubContext";
 import { NFTSelectorGrid } from "./NFTSelectorGrid";
+import { useTransactionReceipts } from "./TransactionReceipts";
 import { MonTicker } from "@/components/site/MonTicker";
 
 const EXPIRY_OPTIONS = [
@@ -33,6 +34,7 @@ export function SwapBuilder() {
   const publicClient = usePublicClient({ chainId: monadTestnet.id });
   const { writeContractAsync } = useWriteContract();
   const queryClient = useQueryClient();
+  const showReceipt = useTransactionReceipts();
 
   const { mode, setMode, setTab } = useHub();
   const { collections, add: addCollection } = useCollections();
@@ -166,6 +168,8 @@ export function SwapBuilder() {
     setError(null);
     setBusy("approve");
     try {
+      let lastReceipt: Awaited<ReturnType<typeof confirmTx>> | null = null;
+      const approvalTransactions: { label: string; hash: `0x${string}` }[] = [];
       for (const nft of unapproved) {
         const hash = await writeContractAsync({
           address: nft,
@@ -174,7 +178,16 @@ export function SwapBuilder() {
           args: [SWEEPER_ADDRESS!, true],
           chainId: monadTestnet.id,
         });
-        await confirmTx(publicClient!, hash);
+        lastReceipt = await confirmTx(publicClient!, hash);
+        approvalTransactions.push({ label: `NFT approval for ${shortAddress(nft)}`, hash: lastReceipt.transactionHash });
+      }
+      if (lastReceipt) {
+        showReceipt({
+          title: "NFT approvals confirmed",
+          summary: `${unapproved.length} collection${unapproved.length === 1 ? "" : "s"} approved for escrow.`,
+          receipt: lastReceipt,
+          relatedTransactions: approvalTransactions.slice(0, -1),
+        });
       }
       await approvals.refetch();
     } catch (e) {
@@ -206,7 +219,18 @@ export function SwapBuilder() {
         value: due,
         chainId: monadTestnet.id,
       });
-      await confirmTx(publicClient!, hash);
+      const receipt = await confirmTx(publicClient!, hash);
+      const side = (assets: readonly { contract: Address; tokenId: bigint }[], mon: bigint) => {
+        const parts: string[] = [];
+        if (assets.length > 0) parts.push(`${assets.length} NFT${assets.length === 1 ? "" : "s"}`);
+        if (mon > 0n) parts.push(`${formatMon(mon, 6)} MON`);
+        return parts.length ? parts.join(" + ") : "Nothing";
+      };
+      showReceipt({
+        title: mode === "direct" ? "Swap offer sent" : "Public trade posted",
+        summary: `You give ${side(offer.offered, offer.offeredMon)} · request ${side(offer.wanted, offer.wantedMon)}.`,
+        receipt,
+      });
       setCreatedHash(hash);
       mine.clear();
       theirs.clear();

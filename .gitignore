@@ -39,3 +39,5 @@ ops/contract-tests/artifacts.json
 ops/ui-e2e/chain.json
 
 ops/ui-e2e/*.log
+.vercel
+.DS_Store

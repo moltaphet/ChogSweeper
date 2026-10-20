@@ -123,8 +123,8 @@ Response: `{ "swaps": [...], "nextCursor": "12" | null }`, newest first.
 ## Known limits
 
 - Ownership indexing covers only registered collections (it does not discover arbitrary contracts).
-- `tokenURI` fetching blocks private IPs by resolving DNS first; a DNS-rebinding race remains, so run the worker in
-  a network segment with no access to internal services.
+- `tokenURI` fetching rejects private and reserved IPs, then pins the validated DNS result to the outbound socket on
+  each request and redirect. Keep the worker isolated from internal services as defense in depth.
 - Images are referenced by normalised URL, not re-hosted. Put an image CDN/proxy in front if gateways are slow.
 - The Next.js API rate-limits its outbound-fetching and list endpoints (Redis when configured, per-instance memory otherwise). The limit keys on `x-forwarded-for`, so deploy behind a proxy that sets it (e.g. Vercel).
 - Not exercised against a live Monad RPC or a running Docker daemon yet (see the test summary).

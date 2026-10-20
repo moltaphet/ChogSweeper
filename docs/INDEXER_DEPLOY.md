@@ -28,7 +28,7 @@ web app reads. Free tiers are enough for the testnet.
 | `DATABASE_URL` | the Supabase **session pooler** string |
 | `DATABASE_SSL_CA` | contents of the project's root CA certificate from **Supabase > Database > Settings > SSL configuration > Download certificate** |
 
-The indexer verifies the Supabase pooler's TLS certificate using `DATABASE_SSL_CA`. Keep certificate verification enabled; do not set `rejectUnauthorized=false` or use `sslmode=no-verify`.
+The indexer verifies the Supabase pooler's TLS certificate using `DATABASE_SSL_CA`. Paste the certificate contents, including the PEM begin/end lines, into this variable. When this CA is set, the indexer removes conflicting SSL query parameters from `DATABASE_URL` before configuring TLS, so a pooler URL containing `sslmode=require` cannot override the supplied CA. Certificate verification stays enabled; do not set `rejectUnauthorized=false` or use `sslmode=no-verify`.
 
 (`COLLECTIONS` is the `indexer/.env` line written by `make export`; copy it from there if the collection list changes.)
 

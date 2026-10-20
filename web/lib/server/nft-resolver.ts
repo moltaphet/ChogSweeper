@@ -7,7 +7,10 @@
  * `node scripts/sync-shared.mjs`; a test fails if they drift. Edit this file only.
  */
 import dns from "node:dns/promises";
+import http from "node:http";
 import net from "node:net";
+import https from "node:https";
+import { Readable } from "node:stream";
 
 // ---------------------------------------------------------------------------------------------- config
 
@@ -254,10 +257,16 @@ function isPrivateIp(ip: string): boolean {
 
 /**
  * tokenURI is attacker-controlled (any collection deployer chooses it), so the resolver must not be usable to
- * reach internal services. Rejects non-http(s) URLs and hosts that are, or resolve to, non-public addresses.
- * Re-checked on every redirect hop. A DNS-rebinding race remains; run this where internal hosts are unreachable.
+ * reach internal services. Rejects non-http(s) URLs and hosts that are, or resolve to, non-public addresses. The
+ * resulting public address is pinned to the socket so a second DNS answer cannot rebind the request.
  */
-export async function assertPublicHttpUrl(raw: string, lookup: Deps["lookup"] = (h) => dns.lookup(h, { all: true })): Promise<URL> {
+interface PublicHttpTarget {
+  url: URL;
+  address: string;
+  family: 4 | 6;
+}
+
+async function resolvePublicHttpTarget(raw: string, lookup: Deps["lookup"] = (h) => dns.lookup(h, { all: true })): Promise<PublicHttpTarget> {
   const url = new URL(raw);
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("unsupported protocol");
   if (url.username || url.password) throw new Error("credentials in url");
@@ -265,7 +274,14 @@ export async function assertPublicHttpUrl(raw: string, lookup: Deps["lookup"] = 
   if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".internal") || host.endsWith(".local")) throw new Error("private host");
   const addrs = net.isIP(host) ? [{ address: host }] : await lookup(host);
   if (addrs.length === 0 || addrs.some((a) => isPrivateIp(a.address))) throw new Error("private address");
-  return url;
+  const address = addrs[0]!.address;
+  const family = net.isIP(address);
+  if (family !== 4 && family !== 6) throw new Error("invalid public address");
+  return { url, address, family };
+}
+
+export async function assertPublicHttpUrl(raw: string, lookup: Deps["lookup"] = (h) => dns.lookup(h, { all: true })): Promise<URL> {
+  return (await resolvePublicHttpTarget(raw, lookup)).url;
 }
 
 // ---------------------------------------------------------------------------------------------- gateway health
@@ -311,7 +327,7 @@ export const resetGatewayHealth = () => penalties.clear();
 
 // ---------------------------------------------------------------------------------------------- fetching
 
-async function readLimited(res: Response, max: number): Promise<Uint8Array> {
+async function readLimited(res: Response, max: number, timeoutMs: number): Promise<Uint8Array> {
   if (Number(res.headers.get("content-length") ?? 0) > max) throw new Error("response too large");
   if (!res.body) {
     const buf = new Uint8Array(await res.arrayBuffer());
@@ -321,34 +337,86 @@ async function readLimited(res: Response, max: number): Promise<Uint8Array> {
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.length;
-    if (total > max) {
-      await reader.cancel().catch(() => {});
-      throw new Error("response too large");
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    void reader.cancel().catch(() => {});
+  }, timeoutMs);
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        if (timedOut) throw new Error("response body timed out");
+        break;
+      }
+      total += value.length;
+      if (total > max) {
+        await reader.cancel().catch(() => {});
+        throw new Error("response too large");
+      }
+      chunks.push(value);
     }
-    chunks.push(value);
+  } catch (error) {
+    if (timedOut) throw new Error("response body timed out");
+    throw error;
+  } finally {
+    clearTimeout(timer);
   }
   return Buffer.concat(chunks);
 }
 
+function requestPinned(target: PublicHttpTarget, signal: AbortSignal, accept: string): Promise<Response> {
+  return new Promise<Response>((resolve, reject) => {
+    const requestFn = target.url.protocol === "https:" ? https.request : http.request;
+    const lookup = ((_: string, options: { all?: boolean }, callback: (...args: any[]) => void) => {
+      if (options?.all) callback(null, [{ address: target.address, family: target.family }]);
+      else callback(null, target.address, target.family);
+    }) as NonNullable<http.RequestOptions["lookup"]>;
+    const req = requestFn(target.url, { method: "GET", headers: { accept }, lookup }, (incoming) => {
+      const headers = new Headers();
+      for (const [name, value] of Object.entries(incoming.headers)) {
+        if (value === undefined) continue;
+        for (const item of Array.isArray(value) ? value : [value]) headers.append(name, item);
+      }
+      const status = incoming.statusCode ?? 502;
+      const noBody = status === 204 || status === 205 || status === 304;
+      const body = noBody ? null : Readable.toWeb(incoming) as ReadableStream<Uint8Array>;
+      if (noBody) incoming.resume();
+      resolve(new Response(body, { status, statusText: incoming.statusMessage, headers }));
+    });
+    const abort = () => req.destroy(signal.reason instanceof Error ? signal.reason : new Error("request aborted"));
+    if (signal.aborted) abort();
+    else signal.addEventListener("abort", abort, { once: true });
+    req.once("close", () => signal.removeEventListener("abort", abort));
+    req.once("error", reject);
+    req.end();
+  });
+}
+
 /**
- * One URL, following redirects by hand so that every hop passes the SSRF guard. The timeout covers the time until
- * response headers arrive; callers that stream a body manage the rest themselves.
+ * One URL, following redirects by hand so that every hop passes the SSRF guard. DNS is resolved and checked once per
+ * hop, then that exact public address is pinned to the socket. The timeout covers response headers; callers manage bodies.
  */
 async function requestFollowing(url: string, o: ResolverOptions, deps: Deps, signal: AbortSignal, accept: string): Promise<Response> {
-  const f = deps.fetch ?? fetch;
   let current = url;
   for (let hop = 0; hop <= o.maxRedirects; hop++) {
-    const target = await assertPublicHttpUrl(current, deps.lookup);
-    const res = await f(target, { redirect: "manual", signal: AbortSignal.any([signal, AbortSignal.timeout(o.timeoutMs)]), headers: { accept } });
+    const target = await resolvePublicHttpTarget(current, deps.lookup);
+    const timeout = new AbortController();
+    const timer = setTimeout(() => timeout.abort(new Error("request headers timed out")), o.timeoutMs);
+    let res: Response;
+    try {
+      const requestSignal = AbortSignal.any([signal, timeout.signal]);
+      res = deps.fetch
+        ? await deps.fetch(target.url, { redirect: "manual", signal: requestSignal, headers: { accept } })
+        : await requestPinned(target, requestSignal, accept);
+    } finally {
+      clearTimeout(timer);
+    }
     if (res.status >= 300 && res.status < 400) {
       const loc = res.headers.get("location");
       await res.body?.cancel().catch(() => {});
       if (!loc) throw new HttpError(res.status, `redirect without location (${res.status})`);
-      current = new URL(loc, target).toString();
+      current = new URL(loc, target.url).toString();
       continue;
     }
     if (!res.ok) {
@@ -427,7 +495,7 @@ export function fetchFirstSuccess(urls: string[], o: ResolverOptions = DEFAULT_O
     urls,
     async (url, signal) => {
       const res = await requestFollowing(url, o, deps, signal, "application/json, */*;q=0.5");
-      const bytes = await readLimited(res, o.maxJsonBytes);
+      const bytes = await readLimited(res, o.maxJsonBytes, o.timeoutMs);
       validate?.(bytes);
       return bytes;
     },
@@ -528,10 +596,21 @@ export function fetchImageStream(urls: string[], o: ResolverOptions = DEFAULT_OP
       if (!res.body) throw new Error("not an image (empty body)");
 
       const reader = res.body.getReader();
-      const first = await Promise.race([
-        reader.read(),
-        new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout waiting for image bytes")), o.timeoutMs)),
-      ]);
+      let firstByteTimer: ReturnType<typeof setTimeout> | undefined;
+      let first: ReadableStreamReadResult<Uint8Array>;
+      try {
+        first = await Promise.race([
+          reader.read(),
+          new Promise<never>((_, rej) => {
+            firstByteTimer = setTimeout(() => {
+              void reader.cancel().catch(() => {});
+              rej(new Error("timeout waiting for image bytes"));
+            }, o.timeoutMs);
+          }),
+        ]);
+      } finally {
+        if (firstByteTimer) clearTimeout(firstByteTimer);
+      }
       if (first.done || !first.value?.length) throw new Error("not an image (empty body)");
       // The first chunk counts toward the cap too: a server may send everything in one piece.
       if (first.value.length > o.maxImageBytes) {

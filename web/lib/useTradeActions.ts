@@ -8,8 +8,10 @@ import { useAccount } from "./useAccount";
 import { confirmTx } from "./confirm";
 import { erc721Abi, sweeperAbi } from "./abi";
 import { SWEEPER_ADDRESS, ZERO_ADDRESS, monadTestnet } from "./config";
-import { sameAddress } from "./format";
+import { formatMon, sameAddress, shortAddress } from "./format";
 import type { SwapRecord } from "./types";
+import { useTransactionReceipts } from "@/components/TransactionReceipts";
+import type { ReceiptNotice } from "@/components/TransactionReceipts";
 
 /**
  * Everything a viewer can do with a trade, shared by the list rows and the detail modal so both
@@ -23,6 +25,7 @@ export function useTradeActions(trade: SwapRecord) {
   const publicClient = usePublicClient({ chainId: monadTestnet.id });
   const { writeContractAsync } = useWriteContract();
   const queryClient = useQueryClient();
+  const showReceipt = useTransactionReceipts();
   const [busy, setBusy] = useState<null | "accept" | "decline" | "cancel">(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,11 +53,12 @@ export function useTradeActions(trade: SwapRecord) {
       publicClient!.readContract({ address: SWEEPER_ADDRESS!, abi: sweeperAbi, functionName: "quoteAcceptance", args: [trade.id, address!] }),
   });
 
-  async function run(kind: "accept" | "decline" | "cancel", action: () => Promise<void>) {
+  async function run(kind: "accept" | "decline" | "cancel", action: () => Promise<ReceiptNotice>) {
     setBusy(kind);
     setError(null);
     try {
-      await action();
+      const confirmed = await action();
+      showReceipt(confirmed);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["trades"] }),
         queryClient.invalidateQueries({ queryKey: ["owned-nfts"] }),
@@ -69,7 +73,19 @@ export function useTradeActions(trade: SwapRecord) {
 
   const send = async (functionName: "cancelSwap" | "declineSwap") => {
     const hash = await writeContractAsync({ address: SWEEPER_ADDRESS!, abi: sweeperAbi, functionName, args: [trade.id], chainId: monadTestnet.id });
-    await confirmTx(publicClient!, hash);
+    const receipt = await confirmTx(publicClient!, hash);
+    return {
+      receipt,
+      relatedTransactions: [],
+      title: functionName === "cancelSwap" ? "Offer cancelled" : "Offer declined",
+      summary: `Trade #${trade.id.toString()} · ${describeSide(trade.offered, trade.offeredMon)} returned to the maker; the platform fee was refunded.`,
+    };
+  };
+
+  const describeSide = (assets: SwapRecord["offered"], mon: bigint) => {
+    const items = assets.map((asset) => `${asset.collectionName ?? shortAddress(asset.contract)} #${asset.tokenId.toString()}`);
+    if (mon > 0n) items.push(`${formatMon(mon, 6)} MON`);
+    return items.length ? items.join(", ") : "Nothing";
   };
 
   return {
@@ -85,6 +101,7 @@ export function useTradeActions(trade: SwapRecord) {
       run("accept", async () => {
         // The taker must approve each wanted collection before handing tokens over.
         const collections = [...new Set(trade.wanted.map((w) => w.contract.toLowerCase()))] as Address[];
+        const approvalTransactions: NonNullable<ReceiptNotice["relatedTransactions"]> = [];
         for (const nft of collections) {
           const approved = await publicClient!.readContract({
             address: nft, abi: erc721Abi, functionName: "isApprovedForAll", args: [address!, SWEEPER_ADDRESS!],
@@ -93,7 +110,8 @@ export function useTradeActions(trade: SwapRecord) {
             const h = await writeContractAsync({
               address: nft, abi: erc721Abi, functionName: "setApprovalForAll", args: [SWEEPER_ADDRESS!, true], chainId: monadTestnet.id,
             });
-            await confirmTx(publicClient!, h);
+            const approvalReceipt = await confirmTx(publicClient!, h);
+            approvalTransactions.push({ label: `NFT approval for ${shortAddress(nft)}`, hash: approvalReceipt.transactionHash });
           }
         }
         // Re-quote right before sending: the fee may have changed since the modal opened.
@@ -103,7 +121,13 @@ export function useTradeActions(trade: SwapRecord) {
         const hash = await writeContractAsync({
           address: SWEEPER_ADDRESS!, abi: sweeperAbi, functionName: "acceptSwap", args: [trade.id], value: required, chainId: monadTestnet.id,
         });
-        await confirmTx(publicClient!, hash);
+        const receipt = await confirmTx(publicClient!, hash);
+        return {
+          receipt,
+          relatedTransactions: approvalTransactions,
+          title: `Trade #${trade.id.toString()} settled`,
+          summary: `You sent ${describeSide(trade.wanted, trade.wantedMon)} and received ${describeSide(trade.offered, trade.offeredMon)}.`,
+        };
       }),
   };
 }

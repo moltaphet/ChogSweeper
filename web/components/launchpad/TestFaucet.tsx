@@ -13,6 +13,7 @@ import { useAccount } from "@/lib/useAccount";
 import { DEFAULT_TEST_MINT_COUNT, TEST_MINT_COLLECTIONS } from "@/lib/testCollections";
 import { MonTicker } from "../site/MonTicker";
 import { useHub } from "../HubContext";
+import { useTransactionReceipts } from "../TransactionReceipts";
 
 const FAUCET_URL = process.env.NEXT_PUBLIC_FAUCET_URL ?? "https://faucet.monad.xyz";
 const MINT_COUNT = BigInt(DEFAULT_TEST_MINT_COUNT);
@@ -148,6 +149,7 @@ function MintRow({ row, account, connected, wrongChain, onMinted }: { row: { slu
   const client = usePublicClient({ chainId: monadTestnet.id });
   const { writeContractAsync } = useWriteContract();
   const qc = useQueryClient();
+  const showReceipt = useTransactionReceipts();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -159,7 +161,8 @@ function MintRow({ row, account, connected, wrongChain, onMinted }: { row: { slu
       const verified = await client.readContract({ address: SWEEPER_ADDRESS, abi, functionName: "isVerified", args: [row.address] });
       if (!verified) throw new Error("This test collection is not enabled for trading yet.");
       const hash = await writeContractAsync({ address: row.address, abi, functionName: "mintBatch", args: [account, MINT_COUNT], chainId: monadTestnet.id });
-      await confirmTx(client, hash);
+      const receipt = await confirmTx(client, hash);
+      showReceipt({ title: "Test NFTs minted", summary: `${MINT_COUNT.toString()} ${row.name} NFTs minted to your wallet.`, receipt });
       onMinted();
       await qc.invalidateQueries();
     } catch (e) {
