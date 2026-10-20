@@ -15,8 +15,18 @@ export function getDb(): Queryable {
     const url = process.env.DATABASE_URL;
     if (!url) throw new Error("DATABASE_URL is not set");
     const ca = process.env.DATABASE_SSL_CA?.replace(/\\n/g, "\n").trim();
+    let connectionString = url;
+    if (ca) {
+      // node-postgres parses connectionString after the explicit options, so
+      // sslmode=require would otherwise overwrite the verified CA settings.
+      const parsed = new URL(url);
+      for (const key of ["ssl", "sslmode", "sslrootcert", "sslcert", "sslkey"]) {
+        parsed.searchParams.delete(key);
+      }
+      connectionString = parsed.toString();
+    }
     g.__pgPool = new pg.Pool({
-      connectionString: url,
+      connectionString,
       ...(ca ? { ssl: { ca, rejectUnauthorized: true } } : {}),
       max: 3,
       idleTimeoutMillis: 10_000,
