@@ -241,9 +241,9 @@ contract ChogSweeperTest is Test {
         nftB.mint(taker, 1);
         uint256 fee = sweeper.feeFor(maker);
         vm.prank(maker);
-        id = sweeper.createSwap{
-            value: offeredMon + fee
-        }(designatedTaker, _assets(nftA, 1, 1), _assets(nftB, 1, 1), uint128(offeredMon), wantedMon, expiry);
+        id = sweeper.createSwap{value: offeredMon + fee}(
+            designatedTaker, _assets(nftA, 1, 1), _assets(nftB, 1, 1), uint128(offeredMon), wantedMon, expiry
+        );
     }
 
     /// @dev Creates a swap for `who`, paying `offeredMon` plus the fee that wallet owes right now.
@@ -257,9 +257,9 @@ contract ChogSweeperTest is Test {
     ) internal returns (uint256 id) {
         uint256 fee = sweeper.feeFor(who);
         vm.prank(who);
-        id = sweeper.createSwap{
-            value: uint256(offeredMon) + fee
-        }(designatedTaker, off, want, offeredMon, wantedMon, expiry);
+        id = sweeper.createSwap{value: uint256(offeredMon) + fee}(
+            designatedTaker, off, want, offeredMon, wantedMon, expiry
+        );
     }
 
     /*------------------------- happy paths -----------------------------*/
@@ -734,9 +734,9 @@ contract ChogSweeperTest is Test {
         uint256 takerBefore = taker.balance;
 
         vm.prank(maker);
-        uint256 id = sweeper.createSwap{
-            value: offeredMon
-        }(taker, _assets(nftA, 1, 1), _assets(nftB, 1, 1), offeredMon, wantedMon, expiry);
+        uint256 id = sweeper.createSwap{value: offeredMon}(
+            taker, _assets(nftA, 1, 1), _assets(nftB, 1, 1), offeredMon, wantedMon, expiry
+        );
         assertEq(address(sweeper).balance, offeredMon);
 
         vm.prank(taker);
@@ -794,9 +794,9 @@ contract ChogSweeperTest is Test {
         uint256 offeredMon = o == 0 ? 1 ether : 0;
 
         vm.prank(maker);
-        uint256 id = sweeper.createSwap{
-            value: offeredMon
-        }(address(0), _assets(nftA, 1000, o), _assets(nftB, 2000, w), uint128(offeredMon), wantedMon, expiry);
+        uint256 id = sweeper.createSwap{value: offeredMon}(
+            address(0), _assets(nftA, 1000, o), _assets(nftB, 2000, w), uint128(offeredMon), wantedMon, expiry
+        );
         vm.prank(taker);
         sweeper.acceptSwap{value: wantedMon}(id);
 
@@ -1304,9 +1304,9 @@ contract ChogSweeperTest is Test {
         uint256 makerBefore = maker.balance;
         uint256 takerBefore = taker.balance;
         vm.prank(maker);
-        uint256 id = sweeper.createSwap{
-            value: uint256(offeredMon) + fee
-        }(taker, _assets(nftA, 1, 1), _none(), offeredMon, wantedMon, expiry);
+        uint256 id = sweeper.createSwap{value: uint256(offeredMon) + fee}(
+            taker, _assets(nftA, 1, 1), _none(), offeredMon, wantedMon, expiry
+        );
 
         vm.prank(taker);
         sweeper.acceptSwap{value: wantedMon}(id);
@@ -1326,9 +1326,9 @@ contract ChogSweeperTest is Test {
 
         uint256 makerBefore = maker.balance;
         vm.prank(maker);
-        uint256 id = sweeper.createSwap{
-            value: uint256(offeredMon) + fee
-        }(taker, _assets(nftA, 1, 1), _none(), offeredMon, 0, expiry);
+        uint256 id = sweeper.createSwap{value: uint256(offeredMon) + fee}(
+            taker, _assets(nftA, 1, 1), _none(), offeredMon, 0, expiry
+        );
         if (decline) {
             vm.prank(taker);
             sweeper.declineSwap(id);
@@ -1662,9 +1662,9 @@ contract ChogSweeperTest is Test {
         _mintRange(nftB, stranger, 301, 1);
         nftA.mint(maker, 1);
         vm.prank(maker);
-        uint256 id = sweeper.createSwap{
-            value: 1 ether
-        }(address(0), _assets(nftA, 1, 1), _assets(nftB, 300, 2), 1 ether, 0, expiry);
+        uint256 id = sweeper.createSwap{value: 1 ether}(
+            address(0), _assets(nftA, 1, 1), _assets(nftB, 300, 2), 1 ether, 0, expiry
+        );
 
         uint256 takerBefore = taker.balance;
         vm.prank(taker);
@@ -1873,9 +1873,11 @@ contract SolvencyHandler is Test {
         ChogSweeper.Asset[] memory none = new ChogSweeper.Asset[](0);
         uint256 fee = sweeper.feeFor(maker);
         vm.prank(maker);
-        try sweeper.createSwap{
-            value: uint256(offeredMon) + fee
-        }(taker, off, none, offeredMon, wantedMon, uint64(block.timestamp + 1 days)) returns (uint256 id) {
+        try sweeper.createSwap{value: uint256(offeredMon) + fee}(
+            taker, off, none, offeredMon, wantedMon, uint64(block.timestamp + 1 days)
+        ) returns (
+            uint256 id
+        ) {
             ids.push(id);
             ghostEscrowMon += uint256(offeredMon) + fee;
         } catch {}
@@ -2009,9 +2011,9 @@ contract ChogSweeperGasTest is Test {
         idOneForOne =
             sweeper.createSwap{value: 0.1 ether}(taker, _assets(nftA, 1, 1), _assets(nftB, 1, 1), 0, 0, expiry);
         idMonOnly = sweeper.createSwap{value: 1.1 ether}(address(0), _none(), _none(), 1 ether, 1 ether, expiry);
-        idTenForTen = sweeper.createSwap{
-            value: 1.1 ether
-        }(taker, _assets(nftA, 2, 10), _assets(nftB, 2, 10), 1 ether, 1 ether, expiry);
+        idTenForTen = sweeper.createSwap{value: 1.1 ether}(
+            taker, _assets(nftA, 2, 10), _assets(nftB, 2, 10), 1 ether, 1 ether, expiry
+        );
         idCancel = sweeper.createSwap{value: 1.1 ether}(address(0), _assets(nftA, 12, 10), _none(), 1 ether, 0, expiry);
         idDecline = sweeper.createSwap{value: 1.1 ether}(taker, _assets(nftA, 22, 10), _none(), 1 ether, 0, expiry);
         idGift = sweeper.createSwap{value: 0.1 ether}(address(0), _assets(nftA, 32, 1), _none(), 0, 0, expiry);
