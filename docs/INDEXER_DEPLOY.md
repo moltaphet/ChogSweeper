@@ -13,6 +13,7 @@ web app reads. Free tiers are enough for the testnet.
 
 ## 2. Railway (the indexer)
 1. New Project > Deploy from GitHub repo > `moltaphet/ChogSweeper`. The root `railway.json` selects `indexer/Dockerfile`.
+   Its restart policy uses `ON_FAILURE` with 10 retries, which is supported on Railway Free. The Free plan does not support `ALWAYS`.
 2. Variables (Service > Variables):
 
 | Variable | Value |
@@ -25,6 +26,9 @@ web app reads. Free tiers are enough for the testnet.
 | `CHOG_COLLECTION` | `0xa1E4279a8E6F302F6f9DDb8f57CeDCB71A52f931` |
 | `COLLECTIONS` | `0xa1E4279a8E6F302F6f9DDb8f57CeDCB71A52f931:70087508:chog,0x786bd6B0a35c5053877D66cdDe88A6b2338EC69c:70502856:monad,0x1f7d461268e5568D09eAe9182429c3F0644E4382:70502856:monad,0x34eD3457B063057742a64e83D3a58fC75eF9e12a:70502856:monad,0x422CC82C81551bebED18Ce2B7204113F1401A386:70502857:monad` |
 | `DATABASE_URL` | the Supabase **session pooler** string |
+| `DATABASE_SSL_CA` | contents of the project's root CA certificate from **Supabase > Database > Settings > SSL configuration > Download certificate** |
+
+The indexer verifies the Supabase pooler's TLS certificate using `DATABASE_SSL_CA`. Keep certificate verification enabled; do not set `rejectUnauthorized=false` or use `sslmode=no-verify`.
 
 (`COLLECTIONS` is the `indexer/.env` line written by `make export`; copy it from there if the collection list changes.)
 

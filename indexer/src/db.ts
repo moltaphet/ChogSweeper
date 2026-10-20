@@ -14,8 +14,13 @@ pg.types.setTypeParser(20, (v) => v);
 pg.types.setTypeParser(1700, (v) => v);
 
 export function createPgDb(connectionString: string): Db {
+  // Supabase's session pooler uses a root CA that is not bundled in Node's
+  // default trust store. Supplying it keeps TLS verification enabled instead
+  // of weakening the connection with rejectUnauthorized: false.
+  const ca = process.env.DATABASE_SSL_CA?.replace(/\\n/g, "\n").trim();
   const pool = new pg.Pool({
     connectionString,
+    ...(ca ? { ssl: { ca, rejectUnauthorized: true } } : {}),
     max: 5,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 10_000,
