@@ -52,3 +52,22 @@ export async function readRecentTrades(client: Pick<PublicClient, "readContract"
   }
   return out;
 }
+
+/** Merge indexed marketplace records with the newest on-chain state. The indexer supplies metadata; chain state wins. */
+export function mergePublicTrades(indexed: readonly SwapRecord[], onchain: readonly SwapRecord[], now = Math.floor(Date.now() / 1000)): SwapRecord[] {
+  const liveChain = new Map(onchain.map((trade) => [trade.id.toString(), trade]));
+  const merged = new Map<string, SwapRecord>();
+
+  for (const trade of indexed) {
+    const current = liveChain.get(trade.id.toString());
+    merged.set(trade.id.toString(), current ? { ...trade, status: current.status, taker: current.taker, expiry: current.expiry } : trade);
+  }
+  for (const trade of onchain) {
+    const id = trade.id.toString();
+    if (!merged.has(id)) merged.set(id, trade);
+  }
+
+  return [...merged.values()]
+    .filter((trade) => trade.status === "pending" && trade.taker.toLowerCase() === ZERO_ADDRESS && trade.expiry > now)
+    .sort((a, b) => (a.id > b.id ? -1 : a.id < b.id ? 1 : 0));
+}

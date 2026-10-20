@@ -1,7 +1,8 @@
 "use client";
 
-import { Activity, PlugZap } from "lucide-react";
+import { Activity, ArrowRight, PlugZap } from "lucide-react";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { formatMon } from "@/lib/format";
 import { useStats, type ActivityItem } from "@/lib/hooks-site";
 import { timeAgo } from "@/lib/time";
@@ -9,6 +10,7 @@ import { EmptyState } from "../EmptyState";
 import { NftImage } from "../NftImage";
 import { VerifiedBadge } from "../VerifiedBadge";
 import { MonTicker } from "@/components/site/MonTicker";
+import { launchpadHref } from "@/lib/routes";
 
 const DOT: Record<ActivityItem["status"], { cls: string; label: string }> = {
   completed: { cls: "bg-status-active", label: "Completed" },
@@ -37,13 +39,18 @@ export function ActivitySection() {
   return (
     <section id="activity" aria-labelledby="activity-title" className="scroll-mt-24">
       <div className="mb-5">
-        <p className="eyebrow">Live from the chain</p>
+        <p className="eyebrow">Indexer-backed stats</p>
         <h2 id="activity-title" className="h-section mt-1">Activity</h2>
         {t && <p className="mt-2 text-sm text-monad-muted">{t.last24h.toLocaleString()} offer{t.last24h === 1 ? "" : "s"} created in the last 24 hours.</p>}
       </div>
 
       {isError ? (
-        <EmptyState icon={PlugZap} compact title="Activity is offline" body="Stats come from the indexer, which isn't reachable right now." />
+        <>
+          <EmptyState icon={PlugZap} compact title="Activity stats are unavailable" body="The indexer is not responding, so totals and recent history cannot be loaded right now." />
+          <Link href={launchpadHref("public")} className="btn-ghost mx-auto mt-3 flex w-fit items-center gap-2">
+            Browse open trades <ArrowRight className="h-4 w-4" aria-hidden />
+          </Link>
+        </>
       ) : (
         <>
           <dl className="grid grid-cols-2 gap-3">

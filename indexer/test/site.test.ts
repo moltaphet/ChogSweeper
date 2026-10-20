@@ -76,29 +76,45 @@ describe("site stats", () => {
 
 describe("site status (a measured fact, not a constant)", () => {
   const client = (head: bigint | Error) => ({ getBlockNumber: async () => { if (head instanceof Error) throw head; return head; } });
-  const dbWithCursor = async (block: number | null) => {
+  const dbWithCursors = async (sweeperBlock: number | null, transfersBlock = sweeperBlock) => {
     const db = await testDb();
-    if (block !== null) await db.query("INSERT INTO indexer_cursors (name, block, block_hash) VALUES ('sweeper', $1, '0x1')", [block]);
+    if (sweeperBlock !== null) await db.query("INSERT INTO indexer_cursors (name, block, block_hash, updated_at) VALUES ('sweeper', $1, '0x1', now())", [sweeperBlock]);
+    if (transfersBlock !== null) await db.query("INSERT INTO indexer_cursors (name, block, block_hash, updated_at) VALUES ('transfers', $1, '0x1', now())", [transfersBlock]);
     return db;
   };
 
   it("operational when the RPC answers and the indexer is caught up", async () => {
-    const s = await getSiteStatus(client(1000n), await dbWithCursor(995));
-    expect(s).toMatchObject({ level: "operational", rpc: { ok: true, head: "1000" }, indexer: { ok: true, lagBlocks: 5 } });
+    const s = await getSiteStatus(client(1000n), await dbWithCursors(995));
+    expect(s).toMatchObject({ level: "operational", rpc: { ok: true, head: "1000" }, indexer: { ok: true, lagBlocks: 5, streams: { sweeper: true, transfers: true } } });
     expect(s.message).toMatch(/All systems operational/);
   });
 
   it("outage when the chain RPC is down", async () => {
-    const s = await getSiteStatus(client(new Error("ECONNREFUSED")), await dbWithCursor(1));
+    const s = await getSiteStatus(client(new Error("ECONNREFUSED")), await dbWithCursors(1));
     expect(s.level).toBe("outage");
     expect(s.rpc.ok).toBe(false);
   });
 
   it("degraded when the indexer is far behind, never run, or the database is unreachable", async () => {
-    expect((await getSiteStatus(client(10_000n), await dbWithCursor(100))).level).toBe("degraded");
-    expect((await getSiteStatus(client(10_000n), await dbWithCursor(null))).level).toBe("degraded");
+    expect((await getSiteStatus(client(10_000n), await dbWithCursors(100))).level).toBe("degraded");
+    expect((await getSiteStatus(client(10_000n), await dbWithCursors(null))).level).toBe("degraded");
     const broken = { query: async () => { throw new Error("down"); } };
     expect((await getSiteStatus(client(10_000n), broken as any)).level).toBe("degraded");
+  });
+
+  it("degrades when the transfer stream is missing or behind even if swaps are current", async () => {
+    const missing = await getSiteStatus(client(1000n), await dbWithCursors(1000, null));
+    expect(missing.indexer).toMatchObject({ ok: false, streams: { sweeper: true, transfers: false } });
+    const behind = await getSiteStatus(client(1000n), await dbWithCursors(1000, 900));
+    expect(behind.indexer).toMatchObject({ ok: false, lagBlocks: 100, streams: { sweeper: true, transfers: false } });
+  });
+
+  it("degrades when a stream cursor stops updating even if it is near the RPC head", async () => {
+    const db = await dbWithCursors(1000);
+    await db.query("UPDATE indexer_cursors SET updated_at = now() - interval '2 minutes' WHERE name = 'transfers'");
+    const s = await getSiteStatus(client(1000n), db);
+    expect(s).toMatchObject({ level: "degraded", indexer: { ok: false, lagBlocks: 0, streams: { sweeper: true, transfers: false } } });
+    expect(s.message).toContain("NFT transfer indexing delayed");
   });
 
   it("reports degraded when no database is configured: chain works but activity and lists do not", async () => {

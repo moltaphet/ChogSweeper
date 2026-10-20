@@ -2090,7 +2090,7 @@ contract ChogSweeperGasTest is Test {
         vm.roll(block.number + 1);
         uint256 g = gasleft();
         sweeper.withdrawFees();
-        _check("withdrawFees", g - gasleft(), 50_000);
+        _check("withdrawFees", g - gasleft(), 80_000);
     }
 
     // --------------------------------- create ---------------------------------

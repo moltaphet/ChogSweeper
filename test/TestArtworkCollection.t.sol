@@ -38,10 +38,11 @@ contract TestArtworkCollectionTest is Test {
     }
 
     function test_RejectsInvalidMintBatchSizes() public {
+        uint256 tooMany = nft.MAX_BATCH() + 1;
         vm.expectRevert(TestArtworkCollection.InvalidBatchSize.selector);
         nft.mintBatch(alice, 0);
         vm.expectRevert(TestArtworkCollection.InvalidBatchSize.selector);
-        nft.mintBatch(alice, nft.MAX_BATCH() + 1);
+        nft.mintBatch(alice, tooMany);
         vm.expectRevert(TestArtworkCollection.InvalidBatchSize.selector);
         nft.mintBatch(address(0), 1);
     }

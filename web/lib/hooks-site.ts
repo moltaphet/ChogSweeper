@@ -3,8 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { usePublicClient } from "wagmi";
 import { fetchTradesFromApi } from "./api";
-import { readRecentTrades } from "./chainTrades";
-import { SWEEPER_ADDRESS, ZERO_ADDRESS, monadTestnet } from "./config";
+import { mergePublicTrades, readRecentTrades } from "./chainTrades";
+import { SWEEPER_ADDRESS, monadTestnet } from "./config";
 import type { SwapRecord } from "./types";
 
 export interface ActivityItem {
@@ -28,7 +28,7 @@ export interface SiteStatus {
   level: "operational" | "degraded" | "outage";
   message: string;
   rpc: { ok: boolean; head: string | null; ms: number | null };
-  indexer: { ok: boolean | null; lagBlocks: number | null };
+  indexer: { ok: boolean | null; lagBlocks: number | null; streams: { sweeper: boolean | null; transfers: boolean | null } };
 }
 
 const json = async <T,>(url: string): Promise<T> => {
@@ -46,14 +46,23 @@ export function usePublicOffers() {
   const client = usePublicClient({ chainId: monadTestnet.id });
   return useQuery<SwapRecord[]>({
     queryKey: ["public-offers"],
-    refetchInterval: 15_000,
+    refetchInterval: 30_000,
     retry: 1,
     queryFn: async () => {
+      let indexed: SwapRecord[] | null = null;
+      let apiError: unknown;
+      try { indexed = await fetchTradesFromApi(undefined, "public"); } catch (e) { apiError = e; }
+      if (!SWEEPER_ADDRESS || !client) {
+        if (indexed) return indexed;
+        throw apiError ?? new Error("Public trades are unavailable");
+      }
       try {
-        return await fetchTradesFromApi(undefined, "public");
-      } catch (e) {
-        if (!SWEEPER_ADDRESS || !client) throw e;
-        return (await readRecentTrades(client)).filter((t) => t.status === "pending" && t.taker === ZERO_ADDRESS);
+        // Check recent contract state even when the API answers: an indexer can be reachable yet behind.
+        const onchain = await readRecentTrades(client, indexed ? 100 : 150);
+        return mergePublicTrades(indexed ?? [], onchain);
+      } catch (chainError) {
+        if (indexed) return indexed;
+        throw chainError;
       }
     },
   });

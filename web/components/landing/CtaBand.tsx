@@ -1,6 +1,6 @@
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Globe } from "lucide-react";
 import Link from "next/link";
-import { LAUNCHPAD_PATH } from "@/lib/routes";
+import { LAUNCHPAD_PATH, launchpadHref } from "@/lib/routes";
 import { ChogCard } from "./ChogCard";
 import { NftCard } from "./NftCard";
 
@@ -23,9 +23,14 @@ export function CtaBand() {
 
         <h2 id="cta-title" className="font-display text-3xl font-extrabold tracking-tight text-white sm:text-5xl">Ready to swap your Chogs?</h2>
         <p className="mx-auto mt-4 max-w-lg text-white/70">Connect a wallet on Monad Testnet, bundle your NFTs and settle the whole deal in one transaction.</p>
-        <Link href={LAUNCHPAD_PATH} className="theme-always-white group mt-8 inline-flex items-center gap-2 rounded-2xl bg-white px-8 py-4 text-base font-bold text-[#3A1FB8] shadow-[0_18px_40px_-12px_rgba(167,139,250,0.9)] transition duration-200 hover:-translate-y-0.5">
-          Open Launchpad <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" aria-hidden />
-        </Link>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <Link href={LAUNCHPAD_PATH} className="theme-always-white group inline-flex items-center gap-2 rounded-2xl bg-white px-8 py-4 text-base font-bold text-[#3A1FB8] shadow-[0_18px_40px_-12px_rgba(167,139,250,0.9)] transition duration-200 hover:-translate-y-0.5">
+            Open Launchpad <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" aria-hidden />
+          </Link>
+          <Link href={launchpadHref("public")} className="inline-flex items-center gap-2 rounded-2xl border border-white/25 bg-white/10 px-7 py-4 text-base font-semibold text-white transition hover:bg-white/15">
+            <Globe className="h-4 w-4" aria-hidden /> Browse open trades
+          </Link>
+        </div>
       </div>
     </section>
   );
