@@ -90,7 +90,7 @@ export function HeroScene() {
           }}
         >
           <div className="animate-float" style={{ ["--r" as string]: `${c.r}deg`, ["--dur" as string]: `${c.dur}s`, ["--fy" as string]: `${c.fy}px`, transform: `rotate(${c.r}deg)` }}>
-            {c.chogSlot === undefined ? <NftCard id={c.id} slot={c.slot} /> : <ChogCard id={c.id} slot={c.chogSlot} />}
+            {"chogSlot" in c ? <ChogCard id={c.id} slot={c.chogSlot} /> : <NftCard id={c.id} slot={c.slot} />}
           </div>
         </div>
       ))}
