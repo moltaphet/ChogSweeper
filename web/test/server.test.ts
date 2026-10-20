@@ -170,7 +170,13 @@ describe("registry", () => {
     expect(r.get(PLAIN)).toMatchObject({ verified: false, ecosystem: null });
   });
   it("ignores malformed entries", () => {
-    expect(registryFromEnv({ VERIFIED_COLLECTIONS: "nope:monad,0x123:chog", NEXT_PUBLIC_COLLECTIONS: "garbage" }).size).toBe(0);
+    const r = registryFromEnv({ VERIFIED_COLLECTIONS: "nope:monad,0x123:chog", NEXT_PUBLIC_COLLECTIONS: "garbage" });
+    // Testnet deployments are included from the checked-in deployment registry even when
+    // all environment-provided entries are malformed.
+    expect(r.has("nope")).toBe(false);
+    expect(r.has("0x123")).toBe(false);
+    expect(r.has("garbage")).toBe(false);
+    expect([...r.values()].every((entry) => entry.address.startsWith("0x") && entry.address.length === 42)).toBe(true);
   });
   it("keeps explicit deploy blocks when an address is also tracked or Chog", () => {
     const r = registryFromEnv({ NEXT_PUBLIC_COLLECTIONS: CHOG, NEXT_PUBLIC_CHOG_COLLECTION: CHOG, VERIFIED_COLLECTIONS: `${CHOG}:chog:1200` });
@@ -303,8 +309,17 @@ describe("getWalletNFTs (database path and chain path)", () => {
     await db.query("INSERT INTO nft_tokens (contract, token_id, owner, name, image_uri, attributes, meta_status) VALUES ($1,1,$2,'Chog #1',$3,'[]','ok')", [CHOG, OWNER, SVG]);
     await db.query("INSERT INTO nft_tokens (contract, token_id, owner) VALUES ($1,2,$2)", [CHOG, OWNER]); // metadata not fetched yet
     await db.query("INSERT INTO nft_tokens (contract, token_id, owner, meta_status, name) VALUES ($1,3,$2,'ok','Not mine')", [CHOG, OTHER]);
+    await db.query("INSERT INTO indexer_cursors (name, block, block_hash, updated_at) VALUES ('transfers',1000000,'0x1',now())");
+    // The testnet registry includes the checked-in deployment set. Mark every registered
+    // collection as fully indexed so this test exercises the database-only path.
+    for (const collection of registryFromEnv().values()) {
+      await db.query(
+        "INSERT INTO nft_collections (address, backfilled_to, start_block) VALUES ($1,1000000,$2) ON CONFLICT (address) DO UPDATE SET backfilled_to = 1000000",
+        [collection.address, collection.startBlock.toString()],
+      );
+    }
+    // CHOG is an additional isolated fixture address used by this test.
     await db.query("UPDATE nft_collections SET backfilled_to = 1000000");
-    await db.query("INSERT INTO indexer_cursors (name, block, block_hash) VALUES ('transfers',1000000,'0x1')");
 
     const { client, calls } = fakeChain({ [CHOG]: { name: "Chog", owners: { "1": OWNER, "2": OWNER }, uris: { "2": jsonUri({ name: "Chog #2 (resolved)", image: SVG }) } } });
     const r = await getWalletNFTs(OWNER, 10143, { db, client });
