@@ -15,7 +15,6 @@ import { useUnread } from "../UnreadContext";
 import { Overview } from "./Overview";
 import { TestFaucet } from "./TestFaucet";
 import { TokenLookup } from "./TokenLookup";
-import { TestNfts } from "./TestNfts";
 
 const TABS = [{ id: "overview" as const, label: "Overview", icon: LayoutDashboard }, ...TOOLS.map((t) => ({ id: t.tab as HubTab, label: t.tabLabel, icon: t.icon }))];
 
@@ -93,7 +92,6 @@ function Workspace() {
                 {tab === "activity" && <div className="p-5 sm:p-7"><ActivitySection /></div>}
                 {tab === "lookup" && <div className="p-5 sm:p-7"><TokenLookup /></div>}
                 {tab === "faucet" && <div className="p-5 sm:p-7"><TestFaucet /></div>}
-                {tab === "test-nfts" && <div className="p-5 sm:p-7"><TestNfts /></div>}
               </div>
             </div>
           </div>

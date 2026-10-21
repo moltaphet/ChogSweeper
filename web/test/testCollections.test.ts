@@ -20,8 +20,8 @@ describe("test collection artwork", () => {
     expect(new Set(SHOWCASE_ART.map((a) => a.collection)).size).toBe(4);
     for (const a of SHOWCASE_ART) expect(existsSync(path.join(process.cwd(), "public", a.src))).toBe(true);
   });
-  it("supports shareable test NFT links", () => {
-    expect(parseTab("test-nfts")).toBe("test-nfts");
-    expect(launchpadHref("test-nfts")).toBe("/launchpad?tab=test-nfts");
+  it("keeps old test NFT links working through the consolidated faucet tab", () => {
+    expect(parseTab("test-nfts")).toBe("faucet");
+    expect(launchpadHref("faucet")).toBe("/launchpad?tab=faucet");
   });
 });

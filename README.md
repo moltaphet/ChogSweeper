@@ -2,7 +2,7 @@
 
 **Peer-to-peer NFT swaps, settled atomically on Monad.**
 
-[Open the app](https://chogsweeper.xyz) · [Source code](https://github.com/moltaphet/ChogSweeper) · [Architecture](docs/ARCHITECTURE.md) · [Testnet deployment](docs/DEPLOYMENT.md) · [Indexer hosting](docs/INDEXER_DEPLOY.md)
+[Open the app](https://chogsweeper.xyz) · [Source code](https://github.com/moltaphet/ChogSweeper) · [Architecture](docs/ARCHITECTURE.md) · [Testnet deployment](docs/DEPLOYMENT.md) · [Indexer hosting](docs/INDEXER_DEPLOY.md) · [Hackathon demo notes](docs/HACKATHON_SUBMISSION.md)
 
 ChogSweeper is an EVM application for trading ERC-721 NFTs and native MON directly between wallets. A maker describes both sides of a trade and deposits the offered assets into the ChogSweeper escrow. A designated wallet can accept a direct offer, or anyone can accept a public offer. The contract transfers both sides in one transaction or leaves the offer open for cancellation, decline, or expiry handling.
 
@@ -65,9 +65,25 @@ web/public/collections/
 └── the-bobs/01.webp … 10.webp
 ```
 
-The **Test NFTs** tab brings the four sample groups together: the existing, verified testnet `MockChog` plus test replicas for r3tards, skrumpeys, and The Bobs. Each replica contract is permissionlessly mintable in batches of up to 10 per transaction, with no lifetime wallet limit; users can mint another batch whenever they need more. There is no mint price; the wallet pays Monad Testnet gas. These test tokens have no monetary value and the three artwork replicas do not use the original collections' contracts.
+The **Test Faucet** tab combines the test MON faucet link and all four test mint groups: the existing, verified testnet `MockChog` plus test replicas for r3tards, skrumpeys, and The Bobs. Each collection is permissionlessly mintable in batches of up to 10 per transaction, with no lifetime wallet limit. There is no mint price; the wallet pays Monad Testnet gas. Old links to `/launchpad?tab=test-nfts` still open this combined page.
 
-All four test collections are deployed and verified on Monad Testnet. Their public addresses are recorded in [`deployments/10143.json`](deployments/10143.json) and generated into [`web/lib/generated/testCollections.ts`](web/lib/generated/testCollections.ts), so a fresh web build can discover them without manually adding hosting variables. The deployment export also fills the `NEXT_PUBLIC_TEST_*_ADDRESS` values in local environment files. To show replica images in external wallets, their on-chain metadata points to the public HTTPS origin serving these WebP files.
+The three artwork collections are **unofficial test replicas**, separate from the named projects' contracts, and are not affiliated with or endorsed by those projects. ChogSweeper does not claim ownership of third-party names, marks, or artwork; contributors must confirm they have permission to distribute the supplied image files or replace them with original/licensed art. These NFTs are test assets with no monetary value.
+
+The four configured test collections are deployed and verified on Monad Testnet. The Chog shown in the mint flow is `MockChog`; it is **not the official Chog NFT collection**. The Chog address found during review is an ERC-20 token, not an ERC-721 collection, so it must not be registered as an NFT; the official Chog NFT contract address remains unverified. The four test collection addresses are recorded in [`deployments/10143.json`](deployments/10143.json) and generated into [`web/lib/generated/testCollections.ts`](web/lib/generated/testCollections.ts), so a fresh web build can discover them without manually adding hosting variables. The deployment export also fills the `NEXT_PUBLIC_TEST_*_ADDRESS` values in local environment files. To show replica images in external wallets, their on-chain metadata points to the public HTTPS origin serving these WebP files.
+
+### Try the app in about three minutes
+
+1. Open [Test Faucet](/launchpad?tab=faucet), connect a wallet, and switch it to Monad Testnet (`10143`).
+2. Use the linked Monad faucet to get test MON for gas. The app does not request or handle real funds.
+3. On the same page, choose a test collection, enter `1`–`10`, and mint. These are practice NFTs; the wallet pays only testnet gas.
+4. Open [New Swap](/launchpad?tab=new), select the NFTs and terms, and choose **Public offer** to make it visible to visitors.
+5. Open [Public Trades](/launchpad?tab=public) from a second wallet/account to inspect and accept it. Accepting an NFT side may require an approval transaction. Check the transaction receipt and then History; cancel an unaccepted offer to return its escrow to the maker.
+
+There are no pre-seeded public offers: they require a real wallet to create and escrow assets. A disconnected visitor can browse the public feed, but an empty feed means no currently active public offer has been posted.
+
+### Product focus and comparison
+
+[Foxy Market](https://foxyswap.net/market/home) describes a broad, multi-chain NFT marketplace with listings, auctions, creator tools, and royalty support. ChogSweeper focuses on a different flow: a wallet-to-wallet offer can exchange NFT bundles across verified collections and native MON, with assets held in escrow and both sides transferred atomically when accepted. ChogSweeper is currently testnet-only and does not implement fixed-price listings, auctions, creator minting, or royalty payouts. This is a scope comparison, not a claim of feature parity or an endorsement by Foxy Market.
 
 See [the deployment guide](docs/DEPLOYMENT.md#7b-more-collections-to-test-with-testnet-only) and [`script/DeployArtworkCollections.s.sol`](script/DeployArtworkCollections.s.sol) for the artwork replica process. The deployment script accepts a public `ARTWORK_BASE_URL`, checks that the broadcaster owns the escrow, and refuses chains other than Monad Testnet and Anvil.
 
@@ -109,8 +125,8 @@ The indexer keeps separate swap-event and NFT-transfer streams. It stores events
 | `/launchpad?tab=collections` | Verified collection registry |
 | `/launchpad?tab=activity` | Marketplace totals and recent activity |
 | `/launchpad?tab=lookup` | Look up an NFT by collection address and token ID |
-| `/launchpad?tab=faucet` | Monad Testnet faucet links, Mock minting, and artwork previews |
-| `/launchpad?tab=test-nfts` | Mint the four verified Monad Testnet test collections (Mock Chog, r3tards, skrumpeys, and The Bobs) |
+| `/launchpad?tab=faucet` | Monad Testnet faucet, balance, and minting for the four practice collections |
+| `/launchpad?tab=test-nfts` | Legacy URL; opens the combined Test Faucet page |
 | `/swap` | Compatibility redirect to the Launchpad |
 
 The active Launchpad tab is URL state, so a link can be shared or reloaded without losing the selected view.
@@ -265,6 +281,10 @@ The script deploys separate test ERC-721 replicas; it does not claim, mint, or a
 ## Security and limits
 
 - The smart contracts are **unaudited**. Use test assets and testnet MON only.
+- There is no emergency pause or upgrade mechanism. This keeps escrow behavior non-upgradeable, but a contract-level defect cannot be patched in place.
+- Only the owner can change the verified collection list, future fee settings (capped at `10 MON`), fee-waiver deadline, and treasury. Existing trades retain their original terms; collected fees can only be sent to the configured treasury. The test deployment currently uses one owner/treasury address, so this is a centralized test setup, not a production governance model.
+- Expiry only prevents acceptance. It does not return escrow automatically; the maker must cancel an expired trade to reclaim the assets and fee. If the maker loses access to the wallet, assets can remain in escrow.
+- The Chog-holder fee exemption checks the maker's current `balanceOf` at offer creation. A temporary loan can therefore qualify a maker for the exemption; the discount is an incentive, not a proof of long-term ownership.
 - The escrow accepts only ERC-721 assets from its owner-managed verified list. The list shown by the web/indexer and the on-chain list are separate and must be kept in sync.
 - A verified collection is a trust decision. Malicious or non-standard token contracts can still behave unexpectedly; verify collection bytecode and provenance before adding it.
 - Offers name specific `(collection, tokenId)` pairs. There are no ERC-1155 trades, ERC-2981 royalty payments, or “any token from this collection” offers.

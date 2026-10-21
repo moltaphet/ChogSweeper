@@ -13,7 +13,7 @@ import { DEFAULT_TEST_MINT_COUNT, TEST_MINT_COLLECTIONS, testNftAbi } from "@/li
 import { useHub } from "../HubContext";
 import { useTransactionReceipts } from "../TransactionReceipts";
 
-export function TestNfts() {
+export function TestNfts({ showIntro = true }: { showIntro?: boolean }) {
   const { address, isConnected, chainId } = useAccount();
   const client = usePublicClient({ chainId: monadTestnet.id });
   const { writeContractAsync } = useWriteContract();
@@ -78,10 +78,15 @@ export function TestNfts() {
   return (
     <section aria-labelledby="test-nfts-title" className="space-y-6">
       <div>
-        <p className="eyebrow">Monad Testnet · Practice trades</p>
-        <h2 id="test-nfts-title" className="h-section mt-1">Get test NFTs. Try a swap.</h2>
-        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-monad-muted">Mint Mock Chog, r3tards, skrumpeys, and The Bobs on Monad Testnet. Choose 1–10 NFTs per transaction and mint again whenever you need more. Each collection must be verified by the ChogSweeper escrow before it can be traded.</p>
-        <p className="mt-2 text-xs text-monad-muted">These are test replicas and mock NFTs with no monetary value. You only pay test MON for network gas; the mint has no price.</p>
+        {showIntro ? <>
+          <p className="eyebrow">Monad Testnet · Practice trades</p>
+          <h2 id="test-nfts-title" className="h-section mt-1">Get test NFTs. Try a swap.</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-monad-muted">Mint Mock Chog, r3tards, skrumpeys, and The Bobs on Monad Testnet. Choose 1–10 NFTs per transaction and mint again whenever you need more. Each collection must be verified by the ChogSweeper escrow before it can be traded.</p>
+        </> : <>
+          <h3 id="test-nfts-title" className="font-display text-lg font-bold text-monad-ink">Mint practice NFTs</h3>
+          <p className="mt-1 max-w-2xl text-sm text-monad-muted">Choose 1–10 per transaction; mint another batch whenever you need more. The mint is free; your wallet pays testnet gas.</p>
+        </>}
+        <p className="mt-2 text-xs text-monad-muted">Mock Chog and the three artwork collections are unofficial test assets with no monetary value. The artwork replicas are not affiliated with or endorsed by the named projects and do not use their NFT contracts.</p>
       </div>
       {wrongChain && <button type="button" className="btn-primary" onClick={() => switchChain({ chainId: monadTestnet.id })}>Switch to Monad Testnet</button>}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -97,7 +102,7 @@ export function TestNfts() {
               <div className="relative mx-auto aspect-square max-w-[220px]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={c.preview} alt={`${c.name} sample NFT`} width={640} height={640} className="h-full w-full object-contain" loading="lazy" />
-                <span className="absolute bottom-1 right-1 rounded-full border border-monad-border bg-monad-surface/95 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-monad-deep">Test replica</span>
+                <span className="absolute bottom-1 right-1 rounded-full border border-monad-border bg-monad-surface/95 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-monad-deep">{c.slug === "chog" ? "Mock test NFT" : "Unofficial replica"}</span>
               </div>
               <h3 className="mt-4 font-display text-lg font-bold">{c.contractName}</h3>
               <p className="mt-1 text-xs text-monad-muted">You own {c.balance === null ? "…" : c.balance.toString()} · up to {c.maxBatch?.toString() ?? "10"} per transaction</p>

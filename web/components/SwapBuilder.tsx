@@ -271,7 +271,7 @@ export function SwapBuilder() {
       {/* ------------------------------ Trade type ------------------------------ */}
       <div className="border-b border-monad-border/70 px-5 py-5 sm:px-7">
         <ModeToggle mode={mode} onChange={setMode} />
-        <p className="mt-3 text-xs text-monad-muted">Need NFTs to practice? <button type="button" className="font-semibold text-monad-deep hover:underline" onClick={() => setTab("test-nfts")}>Get test NFTs</button></p>
+        <p className="mt-3 text-xs text-monad-muted">Need NFTs to practice? <button type="button" className="font-semibold text-monad-deep hover:underline" onClick={() => setTab("faucet")}>Get test NFTs</button></p>
       </div>
 
       {/* The ticket: two halves of one deal, separated by a perforated seam. */}
