@@ -153,6 +153,16 @@ make export
 
 The deployment script adds all three replicas to the escrow's verified list. The export writes their addresses to `web/.env.local`, `deployments/10143.json`, `config/verified-collections.json`, and the generated `web/lib/generated/testCollections.ts`. Commit the deployment record, registry, and generated file so the hosted web build can find the public addresses without manual Vercel variables. Update the hosted indexer's `COLLECTIONS` environment and restart it to backfill the new transfer streams; until then, wallet discovery can read the verified enumerable contracts directly from chain. The Launchpad's combined **Test Faucet** tab checks the live escrow allowlist before enabling each mint button.
 
+## 7c. Connect the real Chog collection
+
+You need two facts about the official Chog **ERC-721** NFT collection on the chain your escrow runs on: its contract address and its deploy block (both on the explorer). The CHOG meme token is an ERC-20 and cannot be used. If the NFT only exists on Monad mainnet (chain 143), a testnet escrow cannot see it; that needs a mainnet deployment (unaudited, so a deliberate decision).
+
+```bash
+make connect-chog CHOG=0xCollection START_BLOCK=12345678
+```
+
+It checks the address answers as an ERC-721, calls `setChogCollection` and `setVerifiedCollections` on the escrow (the key in `.env` must be its owner), records the collection in `config/verified-collections.json` as the Chog ecosystem (the mock becomes an ordinary verified collection) and re-runs the export. Then copy the new `NEXT_PUBLIC_CHOG_COLLECTION`, `NEXT_PUBLIC_COLLECTIONS` and `VERIFIED_COLLECTIONS` into Vercel and `COLLECTIONS` / `CHOG_COLLECTION` into Railway, and redeploy both.
+
 ## 8. Operating notes
 
 * **Change the fee:** owner calls `setPlatformFee(uint128)`. Promotion: `setFeeWaivedUntil(unixTime)`. Capped at 10 MON. Existing trades keep the fee they paid.
