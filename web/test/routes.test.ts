@@ -8,6 +8,7 @@ describe("route helpers", () => {
     expect(parseTab("history")).toBe("history");
     expect(parseTab("public")).toBe("public");
     for (const t of ["new", "collections", "activity", "lookup", "overview"]) expect(parseTab(t)).toBe(t);
+    expect(parseTab("test-nfts")).toBe("faucet");
     for (const bad of [null, undefined, "", "REQUESTS", "admin", "requests ", "__proto__", "../x"]) expect(parseTab(bad as any)).toBe("overview");
   });
 
@@ -32,6 +33,11 @@ describe("route helpers", () => {
 
   it("exposes public offers in the primary navigation as a shareable page", () => {
     expect(NAV.find((item) => item.key === "public-trades")?.href).toBe("/launchpad?tab=public");
+  });
+
+  it("keeps legacy test NFT links on the consolidated test onboarding tab", () => {
+    expect(launchpadHref("faucet")).toBe("/launchpad?tab=faucet");
+    expect(parseTab(new URLSearchParams("tab=test-nfts").get("tab"))).toBe("faucet");
   });
 
   it("updates the tab or mode in a query string and keeps unrelated parameters", () => {

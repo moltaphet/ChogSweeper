@@ -151,7 +151,7 @@ node ops/add-test-collections.mjs --chain-id 10143 --script DeployArtworkCollect
 make export
 ```
 
-The deployment script adds all three replicas to the escrow's verified list. The export writes their addresses to `web/.env.local`, `deployments/10143.json`, `config/verified-collections.json`, and the generated `web/lib/generated/testCollections.ts`. Commit the deployment record, registry, and generated file so the hosted web build can find the public addresses without manual Vercel variables. Update the hosted indexer's `COLLECTIONS` environment and restart it to backfill the new transfer streams; until then, wallet discovery can read the verified enumerable contracts directly from chain. The Launchpad's **Test NFTs** tab checks the live escrow allowlist before enabling each mint button.
+The deployment script adds all three replicas to the escrow's verified list. The export writes their addresses to `web/.env.local`, `deployments/10143.json`, `config/verified-collections.json`, and the generated `web/lib/generated/testCollections.ts`. Commit the deployment record, registry, and generated file so the hosted web build can find the public addresses without manual Vercel variables. Update the hosted indexer's `COLLECTIONS` environment and restart it to backfill the new transfer streams; until then, wallet discovery can read the verified enumerable contracts directly from chain. The Launchpad's combined **Test Faucet** tab checks the live escrow allowlist before enabling each mint button.
 
 ## 8. Operating notes
 
