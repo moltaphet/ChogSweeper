@@ -5,7 +5,7 @@ export
 RPC ?= $(if $(MONAD_TESTNET_RPC_URL),$(MONAD_TESTNET_RPC_URL),https://testnet-rpc.monad.xyz/)
 CHAIN_ID ?= 10143
 
-.PHONY: test test-js test-ui dry-run deploy export test-collections smoke-testnet e2e-local verify-onchain
+.PHONY: test test-js test-ui dry-run deploy export test-collections connect-chog smoke-testnet e2e-local verify-onchain
 
 test:            ## contracts + indexer (if present) + web test suites
 	forge test
@@ -32,6 +32,18 @@ test-collections: ## testnet only: deploy 4 mock partner collections, mint some 
 	@test -f deployments/$(CHAIN_ID).json || { echo "No deployments/$(CHAIN_ID).json yet: run 'make deploy' first."; exit 1; }
 	SWEEPER_ADDRESS=$$(node -p "require('./deployments/$(CHAIN_ID).json').sweeper.address") forge script script/DeployTestCollections.s.sol --rpc-url $(RPC) --broadcast
 	node ops/add-test-collections.mjs --chain-id $(CHAIN_ID)
+	node ops/export-deployment.mjs --chain-id $(CHAIN_ID) --rpc $(RPC)
+
+connect-chog:    ## point the escrow at the real Chog ERC-721: make connect-chog CHOG=0x... START_BLOCK=<its deploy block> (owner key in .env)
+	@test -n "$(CHOG)" && test -n "$(START_BLOCK)" || { echo "usage: make connect-chog CHOG=0x<collection> START_BLOCK=<deploy block>"; exit 1; }
+	@test -f deployments/$(CHAIN_ID).json || { echo "No deployments/$(CHAIN_ID).json yet: run 'make deploy' first."; exit 1; }
+	@echo "Checking that $(CHOG) is an ERC-721 on chain $(CHAIN_ID)..."
+	@test "$$(cast call $(CHOG) 'supportsInterface(bytes4)(bool)' 0x80ac58cd --rpc-url $(RPC))" = "true" || { echo "Not an ERC-721 (supportsInterface(0x80ac58cd) is not true) on this chain. Stop."; exit 1; }
+	@printf "  name   "; cast call $(CHOG) 'name()(string)' --rpc-url $(RPC); printf "  symbol "; cast call $(CHOG) 'symbol()(string)' --rpc-url $(RPC)
+	@S=$$(node -p "require('./deployments/$(CHAIN_ID).json').sweeper.address"); \
+	  cast send $$S 'setChogCollection(address)' $(CHOG) --rpc-url $(RPC) --private-key $$PRIVATE_KEY && \
+	  cast send $$S 'setVerifiedCollections(address[],bool)' '[$(CHOG)]' true --rpc-url $(RPC) --private-key $$PRIVATE_KEY
+	@node ops/connect-chog.mjs --chain-id $(CHAIN_ID) --address $(CHOG) --start-block $(START_BLOCK) --name "$$(cast call $(CHOG) 'name()(string)' --rpc-url $(RPC) | tr -d '\"')"
 	node ops/export-deployment.mjs --chain-id $(CHAIN_ID) --rpc $(RPC)
 
 verify-onchain:  ## read the deployed configuration straight from the chain
