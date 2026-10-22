@@ -298,3 +298,7 @@ The script deploys separate test ERC-721 replicas; it does not claim, mint, or a
 - [Indexing, data flow, API details, metadata resolution, and threat model](docs/ARCHITECTURE.md)
 - [Contract deployment and testnet operations](docs/DEPLOYMENT.md)
 - [Railway, Supabase, and Vercel indexer deployment](docs/INDEXER_DEPLOY.md)
+
+## License
+
+MIT, see [LICENSE](LICENSE). The test NFT artwork replicas and the Chog artwork shown in the app belong to their respective owners and are not covered by this license.
